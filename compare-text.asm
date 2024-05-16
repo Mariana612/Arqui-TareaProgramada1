@@ -5,11 +5,13 @@ section .data
     error_message db 'Failed to open file.', 0xa, 0
     line_message_up db '----No hay una línea anterior----', 0xa, 0
     line_message_down db '----Fin del documento----', 0xa, 0
+    same_text db '----El texto no tiene diferencias----', 0xa, 0
     printCont dq 0
     espacio db 10
      ; Define scan codes for arrow keys
     clear_screen db 33o, "[2J"  	 ; ANSI escape sequence to clear the screen
     null_flag db 0
+    diff_flag db 0
     line_diff_message db 'Diferencia encontrada en la linea: ', 0
 	new_line db 0xa, 0
 	
@@ -41,8 +43,6 @@ _start:
     mov r12, lineLengths
     call store_text
     mov qword [lineCount], r10
-    
-    ;call get_input
 	
 	mov r9, buffer2
     mov r12, lineLengths2
@@ -50,6 +50,11 @@ _start:
 	mov qword [lineCount2], r10
 	
 	call compare
+	
+	mov r9, buffer1
+	call _genericprint
+	
+	call get_input
 
    ; Cerrar
     mov rax, 3
@@ -107,61 +112,6 @@ _readFiles:
     mov rdx, 2050
     syscall
     ret
-    
-_genericprint:
-    mov qword [lineCount], 0    	; Inicializar contador de líneas
-    mov qword [lineCount2], 0    	; Inicializar contador de líneas
-    mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
-    mov qword [wordCount], 0        ; Inicializar contador de palabras
-    mov r8, r9                      ; Guardar el valor del texto en e8
-
-_printLoop:
-    mov cl, [r9]
-    cmp cl, 0
-    je null_flag_line				; Terminar impresión si se encuentra un null
-
-    ; Revisar si el actual caracter es un espacio, tab o enter 
-    cmp cl, ' '
-    je _checkWordBoundary
-    cmp cl, 9
-    je _checkWordBoundary
-    cmp cl, 10
-    je _checkWordBoundary
-
-    inc qword [printCont]           ; Incrementar contador de caracter
-    inc r9                          ; Moverse al siguiente caracter
-    jmp _printLoop					; Seguir en el loop
-
-_checkWordBoundary:
-    inc qword [printCont]           ; Incrementar contador de caracter
-    inc qword [wordCount]           ; Incrementar contador de palabras
-
-    cmp qword [wordCount], 10       ; Revisar si ya se tienen las 10 palabras
-    jne _continuePrinting
-    
-    jmp _endPrint
-
-null_flag_line:
-	mov byte [null_flag], 1			; Colocar flag de última línea
-
-_endPrint:
-    mov rax, 1
-    mov rdi, 1
-    mov rdx, [printCont]			; Variable de cantidad de caracteres
-    mov rsi, r8						; Contiene el inicio de la línea
-    syscall
-    
-    ; Imprimir un enter
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, espacio
-    mov rdx, 1
-    syscall
-    ret
-
-_continuePrinting:
-    inc r9                          ; Moverse al siguiente caracter
-    jmp _printLoop					; Seguir con el loop
 
 ;--------------------BEGIN COMPARE
 
@@ -171,14 +121,28 @@ compare:
 	xor rcx, rcx
 	xor rbx, rbx
 	xor r8, r8
-	mov rax, 0 ;Contador de indice de un string
+	xor rsi, rsi
+	xor r14, r14
+	mov byte [diff_flag], 0
+	mov rax, 0 ;Contador de indice del buffer1
+	mov rsi, 0 ;Contador de indice del buffer2
 	mov rdx, 0 ;Num de chars en LineLengths
 	mov rcx, 0 ;Num de chars en LineLengths2
-	mov rbx, 0 ;Contador de posiciones en los LineLengths
-	mov r8, 0
+	mov r8, 0  ;Conatdor de los chars
+	
+	mov rbx, qword[lineCount]
+	cmp rbx, qword[lineCount2]
+	jge establish_lineCount
+	mov r15, qword[lineCount2]
+	mov rbx, 0 ;Contador de posiciones en los LineLengths/2
+	jmp compare_loop_lines
+
+establish_lineCount:
+	mov r15, qword[lineCount]
+	mov rbx, 0 ;Contador de posiciones en los LineLengths/2
 
 compare_loop_lines:
-	cmp rbx, qword[lineCount]
+	cmp rbx, r15
 	je textos_iguales
 	
 	mov rdx, [lineLengths + rbx * 8]
@@ -191,20 +155,6 @@ compare_loop_lines:
 cont_compare_loop:
 	mov r8, 0
 	inc rbx
-	
-	push rax
-	push rbx
-	push rcx
-	push rdx
-	push r8
-	mov rax, error_message
-	call _genericprint2
-	pop r8
-	pop rdx
-	pop rcx
-	pop rbx
-	pop rax
-	
 	jmp compare_loop_lines
 
 compare_loop_chars:
@@ -212,58 +162,80 @@ compare_loop_chars:
 	je cont_compare_loop
 	
 	mov r10b, byte[buffer1 + rax]
-	mov r11b, byte[buffer2 + rax]
+	mov r11b, byte[buffer2 + rsi]
+	
 	cmp r10b, r11b
 	jne diferencia_lineas
 	
 	inc rax
+	inc rsi
 	inc r8
 	jmp compare_loop_chars
 
 diferencia_lineas:
+	mov byte [diff_flag], 1
 	push rax
 	push rbx
 	push rcx
 	push rdx
 	push r8
+	push rsi
+	push r14
 	mov rax, line_diff_message
 	call _genericprint2
-	
 	mov rcx, rbx
 	call _startItoa
+	pop r14
+	pop rsi
 	pop r8
 	pop rdx
 	pop rcx
 	pop rbx
 	pop rax
 	
-	mov r8, 0
 	inc rbx
+	inc r8
+	sub r8, rdx
+	neg r8
+	add rax, r8
+	add rsi, r8
+	mov r8, 0
 	jmp compare_loop_lines
 
 diferencia_lineas_count:
+	mov byte [diff_flag], 1	
 	push rax
 	push rbx
 	push rcx
 	push rdx
 	push r8
+	push rsi
+	push r14
 	mov rax, line_diff_message
 	call _genericprint2
 	mov rcx, rbx
 	call _startItoa
+	pop r14
+	pop rsi
 	pop r8
 	pop rdx
 	pop rcx
 	pop rbx
 	pop rax
 	
-	mov r8, 0
 	inc rbx
+	add rax, rdx
+	add rsi, rcx
 	jmp compare_loop_lines
 
 textos_iguales:
-	mov rax, filename1
+	cmp byte[diff_flag], 1
+	je diferencias_encontradas
+	
+	mov rax, same_text
 	call _genericprint2
+	
+diferencias_encontradas:
 	ret
 	 	 
 ;----------------------------------------------------------------------
@@ -319,8 +291,6 @@ store:
     push rdi
     push r12
     push r10
-    ;mov rbx, qword[lineCount]		; Se guarda el contador de líneas en un registro
-    ;mov rsi, lineLengths			; Se guarda la variable de la lista de tamaños de líneas en un registro
     mov rdi, qword[printCont]		; Se guarda el contador de caracteres de la línea en un registro
     mov qword [r12 + r10 * 8], rdi	; Se guarda la cantidad de caracteres de la línea actual en la variable lineLengths
     pop r10
@@ -330,7 +300,6 @@ store:
 	
 	add r8, [printCont]				; Avanza a la siguiente línea
 	inc r9							; Se incrementa el puntero para que apunte a la primera letra de la línea
-	;inc qword [lineCount]			; Se incrementa el contador de líneas
 	inc r10
     
     mov qword [wordCount], 0        ; Se resetea el contador de palabras
@@ -343,6 +312,61 @@ end_loop_store:
 
 
 ; -------------------END COMPARE
+
+_genericprint:
+    mov qword [lineCount], 0    	; Inicializar contador de líneas
+    mov qword [lineCount2], 0    	; Inicializar contador de líneas
+    mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
+    mov qword [wordCount], 0        ; Inicializar contador de palabras
+    mov r8, r9                      ; Guardar el valor del texto en e8
+
+_printLoop:
+    mov cl, [r9]
+    cmp cl, 0
+    je null_flag_line				; Terminar impresión si se encuentra un null
+
+    ; Revisar si el actual caracter es un espacio, tab o enter 
+    cmp cl, ' '
+    je _checkWordBoundary
+    cmp cl, 9
+    je _checkWordBoundary
+    cmp cl, 10
+    je _checkWordBoundary
+
+    inc qword [printCont]           ; Incrementar contador de caracter
+    inc r9                          ; Moverse al siguiente caracter
+    jmp _printLoop					; Seguir en el loop
+
+_checkWordBoundary:
+    inc qword [printCont]           ; Incrementar contador de caracter
+    inc qword [wordCount]           ; Incrementar contador de palabras
+
+    cmp qword [wordCount], 10       ; Revisar si ya se tienen las 10 palabras
+    jne _continuePrinting
+    
+    jmp _endPrint
+
+null_flag_line:
+	mov byte [null_flag], 1			; Colocar flag de última línea
+
+_endPrint:
+    mov rax, 1
+    mov rdi, 1
+    mov rdx, [printCont]			; Variable de cantidad de caracteres
+    mov rsi, r8						; Contiene el inicio de la línea
+    syscall
+    
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+    ret
+
+_continuePrinting:
+    inc r9                          ; Moverse al siguiente caracter
+    jmp _printLoop					; Seguir con el loop
 
 ; Leer input del usuario
 get_input:
