@@ -8,7 +8,10 @@ section .data
 	text_escojaLineaEF  db 'Por favor seleccione la linea que desea modificar',0
 	text_ingreseDocumento db 'Por favor ingrese un documento', 0
 	flag_printOnePhrase db 0
-	testInput db '2',10,0
+	lentext dq 0 
+	lenUserText dq 0
+	lenStartingText dq 0
+
 	
 
 section .bss
@@ -17,6 +20,9 @@ section .bss
     printCont resq 1          ; Initialize print content count
     wordCount resq 1          ; Initialize word count
     lastPrint resq 1          ; Pointer to start of last printed word
+    lenPrint resq 1
+    sumPrint resq 1
+    
     buffer resb 2050
 
 section .text
@@ -42,7 +48,7 @@ get_input:
     mov rax, 0
     mov rdi, 0
     mov rsi, user_input
-    mov rdx, 2
+    mov rdx, 2050
     syscall
     ret
 
@@ -124,7 +130,7 @@ _checkWordBoundaryFP:
     syscall
     
     cmp byte[flag_printOnePhrase], 1
-    je _finishGenericLoop
+    je _finishSpecialFP
     
     jmp _continueBoundary
     
@@ -158,7 +164,7 @@ _endPrintFP:
     mov rbx, [user_input]    ; Load '1' from buffer into BL
 
     cmp rax, rbx
-    jne _finishGenericLoop
+    jne _finishSpecialFP
     
     _firstcontinueEP:
     mov rax, 1
@@ -182,7 +188,16 @@ _finalizeFP:
     call _enterPrint
     call _enterPrint
     ret
+   
+_finishSpecialFP:
+	mov rsi, [lastPrint]      ; Get the pointer to the last printed position
+    mov rdx, r9               ; Get the current position in text
+    sub rdx, rsi
+    mov qword[lenPrint], rdx
     
+
+	ret
+ 
 ;-------------- PRINT DE TODO EL DOCUMENTO CON SUS LINEAS --------------
 
 ;--------------------- MANEJO DE EDICION DE CODIGO ---------------------
@@ -196,7 +211,44 @@ _manageEdit:
     call get_input
     mov byte[flag_printOnePhrase],1
     call _startFullPrint
+    call get_input
+    call _getInputInfo
+    call _editText
     ret
+
+_getInputInfo:
+	mov rdi, user_input 
+	call _calculate_size
+	
+	mov rax, qword[lentext]
+	mov qword[lenUserText], rax
+	
+	mov rsi, [lenUserText]
+	call _startItoa
+	
+	mov rax, buffer
+	call _genericprint
+	
+	;---- texto original
+	mov rdi, text_start 
+	call _calculate_size
+	
+	mov rax, qword[lentext]
+	mov qword[lenStartingText], rax
+	
+	mov rsi, [lenStartingText]
+	call _startItoa
+	
+	mov rax, buffer
+	call _genericprint
+	
+	;----------- fin linea
+	ret
+	
+ 
+    
+_editText:
+
 
 ;--------------------- MANEJO DE EDICION DE CODIGO ---------------------  
 ;-------------------------------- ITOA ---------------------------------
@@ -223,10 +275,6 @@ _startItoa:
     
     ; Termina la cadena con null
     mov byte [buffer + r8], 0
-
-    ;mov rax, buffer
-    
-    ;call  _genericprint
     
     ret
 
@@ -294,11 +342,29 @@ _enterPrint:
     syscall
     ret
 ;------------------------- GENERIC PRINT -------------------------------
+;---------------------------- MISCELANEO -------------------------------
 _finishCode:
 	mov rax, 60
 	mov rdi, 0
 	syscall
+	
 
-_finishGenericLoop:
-	ret
+_calculate_size:
+    push rdi    ; Guarda el valor original de RDI
+    xor rcx, rcx    ; RCX será nuestro contador de caracteres
+
+count_loopCS:
+    cmp byte [rdi], 0    	; Compara el carácter actual con 0 (carácter nulo)
+    je end_loop    			; Si es cero, termina el bucle
+    inc rdi    				; Incrementa el puntero al siguiente carácter
+    inc rcx    				; Incrementa el contador de caracteres
+    jmp count_loopCS   		; Repite el bucle
+
+end_loop:
+    mov [lentext], rcx    	; Escribe el contador en la variable 'len'
+    pop rdi    				; Restaura el valor original de RDI
+    ret    					; Retorna de la función
+	
+;---------------------------- MISCELANEO -------------------------------
+
 
