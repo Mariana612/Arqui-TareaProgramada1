@@ -1,7 +1,17 @@
 section .data
     espacio db 10             ; New line character for syscalls
+    text_start db 'hola me llamo sandia carrasco y me gusta las sandia amarrilla no la roja es que la roja es fea, ademas la gente solo piensa en la sandia roja esto es una palabra por favor me gusta holi.', 0
+	; --Menu
+	text_menuInicial db 'Bienvenido a el editor de documnetos, que desea realizar?', 0
+	text_menuInicialCont db 'a) Editar un documento b) Terminar Programa', 0
+	;-- Edit file
+	text_escojaLineaEF  db 'Por favor seleccione la linea que desea modificar',0
+	text_ingreseDocumento db 'Por favor ingrese un documento', 0
+	flag_printOnePhrase db 0
+	
 
 section .bss
+	user_input resb 5 
     lineCount resq 1          ; Initialize line count
     printCont resq 1          ; Initialize print content count
     wordCount resq 1          ; Initialize word count
@@ -12,8 +22,38 @@ section .text
     global _start
 
 _start:
+	mov rax, text_menuInicial
+    call _genericprint  
+    call _enterPrint 
+    
+    mov rax, text_menuInicialCont
+    call _genericprint   
+    call _enterPrint
+    
+    call get_input
+    call menu_compare
+    
+    jmp _finishCode
 
+;-------------- INTERACCION CON EL USUARIO -----------------------
+get_input:
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, user_input
+    mov rdx, 2
+    syscall
+    ret
 
+menu_compare:   
+    cmp byte[user_input], 'a'		; Up, se mueve una línea de texto hacia arriba
+    je _startFullPrint
+    cmp byte[user_input], 'b'		; Quit, se sale del programa
+    je _finishCode
+    ret
+
+;-------------- INTERACCION CON EL USUARIO -----------------------  
+    
+;-------------- PRINT DE TODO EL DOCUMENTO CON SUS LINEAS --------------
 _startFullPrint:
     mov r9, text_start        ; Pointer to start of the text
     mov [lastPrint], r9       ; Initialize lastPrint to start of text
@@ -28,7 +68,7 @@ _printLoopFP:
     mov cl, [r9]
     test cl, cl
     jz _endPrintFP              ; End if NULL character is reached
-    ; Check if character is space, tab, or newline
+
     cmp cl, ' '
     je _checkWordBoundaryFP
     cmp cl, 9                 ; ASCII for Tab
@@ -51,10 +91,10 @@ _checkWordBoundaryFP:
     mov rax, 1
     mov rdi, 1
     mov rsi, buffer
-    mov rdx, 2               ; Number of characters from lastPrint to current position
+    mov rdx, 5              ; Number of characters from lastPrint to current position
     syscall
 
-    ; Logic to print every ten words
+
 	mov rax, 1                  ; syscall: write
 	mov rdi, 1                  ; fd: stdout
 	mov rsi, [lastPrint]        ; Start of string to print
@@ -89,8 +129,7 @@ _endPrintFP:
     mov rsi, buffer
     mov rdx, 2               ; Number of characters from lastPrint to current position
     syscall
-
-; Check if there's remaining content to print
+    
     mov rsi, [lastPrint]      ; Get the pointer to the last printed position
     mov rdx, r9               ; Get the current position in text
     sub rdx, rsi              ; Calculate the length of the remaining text
@@ -103,17 +142,26 @@ _endPrintFP:
     syscall                   ; Execute the print
 
 _finalizeFP:
-    ; Optionally, ensure the output ends with a newline
-    mov rax, 1
-    mov rdi, 1
-    lea rsi, [espacio]        ; Load the address of the newline character
-    mov rdx, 1                ; Length is 1
-    syscall
-    ; Optional: Print remaining content if not empty
+    call _enterPrint
+    call _enterPrint
+    jmp _manageEdit
+
     
-    jmp _finishCode
-    ;ret
+
     
+;-------------- PRINT DE TODO EL DOCUMENTO CON SUS LINEAS --------------
+
+;--------------------- MANEJO DE EDICION DE CODIGO ---------------------
+_manageEdit:
+    mov rax, text_escojaLineaEF
+    call _genericprint   
+    call _enterPrint
+    
+    call get_input
+    ret
+
+;--------------------- MANEJO DE EDICION DE CODIGO ---------------------  
+;-------------------------------- ITOA ---------------------------------
 _startItoa: 
     mov rdi, buffer
     mov rsi, rsi 
@@ -167,7 +215,41 @@ itoa:
 
     mov rax, rsi                    ; Devuelve la longitud de la cadena
     ret
+;-------------------------------- ITOA ---------------------------------
+
+;------------------------- GENERIC PRINT -------------------------------
+_genericprint:
+    mov qword [printCont], 0        ;coloca rdx en 0 (contador)
+    push rax        ;almacenamos lo que esta en rax
+
+_printLoop:
+    mov cl, [rax]
+    cmp cl, 0
+    je _endPrint
+    inc qword [printCont]                ;aumenta contador
+    inc rax
+    jmp _printLoop
+
+_endPrint:
+    mov rax, 1
+    mov rdi, 1
+    mov rdx,[printCont]
+    pop rsi            ;texto
+    syscall
+    ret
+    
+_enterPrint:
+    mov rax, 1
+    mov rdi, 1
+    lea rsi, [espacio]        ; Load the address of the newline character
+    mov rdx, 1                ; Length is 1
+    syscall
+    ret
+;------------------------- GENERIC PRINT -------------------------------
+_finishCode:
+	mov rax, 60
+	mov rdi, 0
+	syscall
 
 
-section .data
-    text_start db 'hola me llamo sandia carrasco y me gusta las sandia amarrilla no la roja es que la roja es fea, ademas la gente solo piensa en la sandia roja esto es una palabra por favor me gusta holi.', 0
+
