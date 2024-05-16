@@ -20,6 +20,7 @@ section .bss
     bufferNum resb 2050
     wordCount resq 1                 ; Counter for words
     lineCount resq 1                 ; Counter for lines
+    lineCount2 resq 1
     user_input resb 2           	 ; Buffer to store user input
     lineLengths resq 10    ; Array to store lengths of each line
     lineLengths2 resq 10
@@ -36,10 +37,17 @@ _start:
         	
     call _readFiles     
 	
+	
+	
+	
 	mov r9, buffer1 ;Imprimir el texto
     call _genericprint
     
+    ;call get_input
+    
 	call store_loop
+	
+	mov byte [null_flag], 0
 	
 	mov r9, buffer2
 	call _genericprint
@@ -162,9 +170,47 @@ _continuePrinting:
 ;--------------------BEGIN COMPARE
 
 compare:
+	mov rdi, lineLengths
+	mov rsi, lineLengths2
+	
+    mov rbx, qword [lineCount]
+    
+    mov rcx, 0
+
+.compare_loop:
+    mov rax,  [rsi + rcx * 8]    ; Length from lineLength
+    mov r8,  [rdi + rcx * 8]    ; Length from lineLengths2
+    
+    push rsi
+    mov rsi, [lineLengths]
+    call _startItoa
+    mov rsi, [lineLengths2]
+    call _startItoa
+    pop rsi
+    
+    cmp rax, r8
+    jne .print_difference
+    
+    inc rcx
+    cmp rcx, rbx
+    jl .compare_loop
+    
+    ret
+    
+.print_difference:
+	push rcx
+	push rsi
+	mov rax, line_diff_message
+	call _genericprint2
+	pop rsi
+	pop rcx
+	
+	mov rsi, rcx
+	call _startItoa
+	
+	
 	ret
-	 
-	 
+	
 	 
 ;----------------------------------------------------------------------
 store_loop:
@@ -199,6 +245,7 @@ store:
     
     call _printLoop
 
+	
     jmp store_loop
 
 end_loop2:
@@ -206,11 +253,10 @@ end_loop2:
 
 set_null_flag:
     mov byte [null_flag], 1
-
-    ret
+	ret
     
 store_loop2:
-	call store
+	call store2
 	
 	cmp byte[null_flag], 1
 	je end_loop2
@@ -224,8 +270,8 @@ store2:
     
     push rbx
     push rsi
-    mov rbx, qword[lineCount]		; Se guarda el contador de líneas en un registro
-    mov rsi, lineLengths2			; Se guarda la variable de la lista de tamaños de líneas en un registro
+    mov rbx, qword[lineCount2]		; Se guarda el contador de líneas en un registro
+    mov rsi, lineLengths2		; Se guarda la variable de la lista de tamaños de líneas en un registro
     mov rdi, qword[printCont]		; Se guarda el contador de caracteres de la línea en un registro
     mov qword [rsi + rbx * 8], rdi	; Se guarda la cantidad de caracteres de la línea actual en la variable lineLengths
     pop rdi
@@ -234,7 +280,7 @@ store2:
     
 	add r8, [printCont]				; Avanza a la siguiente línea
 	inc r9							; Se incrementa el puntero para que apunte a la primera letra de la línea
-	inc qword [lineCount]			; Se incrementa el contador de líneas
+	inc qword [lineCount2]			; Se incrementa el contador de líneas
     
     mov qword [wordCount], 0        ; Se resetea el contador de palabras
     mov qword [printCont], 0        ; Se resetea el contador de caracteres
@@ -300,7 +346,7 @@ get_input:
     
     push rbx
     push rsi
-    mov rbx, qword[lineCount]		; Se guarda el contador de líneas en un registro
+    mov rbx, qword [lineCount]		; Se guarda el contador de líneas en un registro
     mov rsi, lineLengths			; Se guarda la variable de la lista de tamaños de líneas en un registro
     mov rdi, qword[printCont]		; Se guarda el contador de caracteres de la línea en un registro
     mov qword [rsi + rbx * 8], rdi	; Se guarda la cantidad de caracteres de la línea actual en la variable lineLengths
@@ -311,6 +357,7 @@ get_input:
 	add r8, [printCont]				; Avanza a la siguiente línea
 	inc r9							; Se incrementa el puntero para que apunte a la primera letra de la línea
 	inc qword [lineCount]			; Se incrementa el contador de líneas
+    
     
     mov qword [wordCount], 0        ; Se resetea el contador de palabras
     mov qword [printCont], 0        ; Se resetea el contador de caracteres
@@ -345,7 +392,7 @@ last_line:
 ;----------------------ITOA
 _startItoa:
 	mov rdi, bufferItoa
-    mov rsi, rcx 
+    mov rsi, rsi 
     mov rbx, 10       ; La base
     call itoa
     mov r8, rax
