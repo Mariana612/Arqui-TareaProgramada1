@@ -151,6 +151,16 @@ _endPrintFP:
     mov rsi, [lineCount]
     call _startItoa
     
+    cmp byte[flag_printOnePhrase], 0
+    je _firstcontinueEP
+
+    mov rax, [buffer] ; Load '1' from userInput into AL
+    mov rbx, [user_input]    ; Load '1' from buffer into BL
+
+    cmp rax, rbx
+    jne _finishGenericLoop
+    
+    _firstcontinueEP:
     mov rax, 1
     mov rdi, 1
     mov rsi, buffer
@@ -172,9 +182,6 @@ _finalizeFP:
     call _enterPrint
     call _enterPrint
     ret
-
-    
-
     
 ;-------------- PRINT DE TODO EL DOCUMENTO CON SUS LINEAS --------------
 
