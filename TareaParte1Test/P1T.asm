@@ -65,7 +65,6 @@ menu_compare:
     
 ;-------------- PRINT DE TODO EL DOCUMENTO CON SUS LINEAS --------------
 _startFullPrint:
-    mov r9, text_start        ; Pointer to start of the text
     mov [lastPrint], r9       ; Initialize lastPrint to start of text
     
     
@@ -209,6 +208,7 @@ _finishSpecialFP:
 ;--------------------- MANEJO DE EDICION DE CODIGO ---------------------
 _manageEdit:
 	mov byte[flag_printOnePhrase],0
+	mov r9, text_start 
 	call _startFullPrint
     mov rax, text_escojaLineaEF
     call _genericprint   
@@ -216,12 +216,9 @@ _manageEdit:
     
     call get_input
     mov byte[flag_printOnePhrase],1
+    mov r9, text_start 
     call _startFullPrint
-    call get_input
-    
-    mov rdi, rax      ; Use rax (bytes read) to calculate the index of the last byte
-    dec rdi           ; Adjust for zero-based index
-    mov byte [rsi + rdi], 0 ; Null-terminate the string at the newline characte
+    call get_inputSPECIAL
     
     call _getInputInfo
     mov byte[flag_printOnePhrase],0
@@ -236,35 +233,36 @@ _getInputInfo:
 	mov rax, qword[lentext]
 	mov qword[lenUserText], rax
 	
-	mov rsi, [lenUserText]
-	call _startItoa
-	
-	mov rax, buffer
-	call _genericprint
-	
 	;---- texto original
 	mov rdi, text_start 
 	call _calculate_size
 	
 	mov rax, qword[lentext]
 	mov qword[lenStartingText], rax
-	
-	mov rsi, [lenStartingText]
-	call _startItoa
-	
-	mov rax, buffer
-	call _genericprint
-	
-	;----------- fin linea
-	mov rsi, [lenFirstPart]
-	call _startItoa
-	
-	mov rax, buffer
-	call _genericprint
-	
 
 	ret
 	
+get_inputSPECIAL:
+    mov rax, 0         ; syscall number for read
+    mov rdi, 0         ; file descriptor 0 (stdin)
+    mov rsi, user_input; buffer to store the input
+    add rsi, 1         ; Adjust buffer pointer to leave space for the space character
+    mov rdx, 2049      ; reduce max bytes by one to account for the space at the start
+    syscall            ; perform the syscall
+
+    ; Assuming rax contains the number of bytes read, adjust for newline character
+    test rax, rax      ; Check if any bytes were read
+    jz input_done      ; Jump if zero bytes were read (skip if input is empty)
+
+    dec rax            ; Decrement rax to exclude the newline character from the count
+    mov byte [rsi + rax], 0 ; Replace newline with null terminator
+
+    ; Insert space at the beginning of the buffer
+    dec rsi            ; Move back to the start of the buffer
+    mov byte [rsi], ' '; Insert space character
+
+input_done:
+    ret                ; Return from the function
  
     
 _editText:
@@ -291,8 +289,11 @@ _editText:
     mov rcx, r9 ; Longitud total menos lo ya copiado
     rep movsb
 
-    mov rax, new_text
-    call _genericprint
+	mov r9, new_text 
+	call _startFullPrint
+	
+    ;mov rax, new_text
+    ;call _genericprint
 
 	ret
 
