@@ -8,6 +8,7 @@ section .data
 	text_escojaLineaEF  db 'Por favor seleccione la linea que desea modificar',0
 	text_ingreseDocumento db 'Por favor ingrese un documento', 0
 	flag_printOnePhrase db 0
+	testInput db '2',10,0
 	
 
 section .bss
@@ -30,6 +31,7 @@ _start:
     call _genericprint   
     call _enterPrint
     
+    
     call get_input
     call menu_compare
     
@@ -46,7 +48,7 @@ get_input:
 
 menu_compare:   
     cmp byte[user_input], 'a'		; Up, se mueve una línea de texto hacia arriba
-    je _startFullPrint
+    je _manageEdit
     cmp byte[user_input], 'b'		; Quit, se sale del programa
     je _finishCode
     ret
@@ -88,11 +90,33 @@ _checkWordBoundaryFP:
     mov rsi, [lineCount]
     call _startItoa
     
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, buffer
-    mov rdx, 5              ; Number of characters from lastPrint to current position
-    syscall
+    cmp byte[flag_printOnePhrase], 0
+    je _firstcontinueBoundary
+
+    
+    
+    mov rax, user_input ; Load '1' from userInput into AL
+    ;mov rbx, [buffer]    ; Load '1' from buffer into BL
+    ;mov rsi, rbx
+    call _genericprint
+    
+    xor rax, rax
+    mov rax, testInput ; Load '1' from userInput into AL
+    ;mov rbx, [buffer]    ; Load '1' from buffer into BL
+    ;mov rsi, rbx
+    call _genericprint
+    xor rax, rax
+    mov rax, user_input ; Load '1' from userInput into AL
+    
+    cmp rax, [testInput]
+    jne _skipLinePLTE
+    
+    _firstcontinueBoundary:
+    ;mov rax, 1
+    ;mov rdi, 1
+    ;mov rsi, buffer
+    ;mov rdx, 5              ; Number of characters from lastPrint to current position
+    ;syscall
 
 
 	mov rax, 1                  ; syscall: write
@@ -109,7 +133,21 @@ _checkWordBoundaryFP:
     mov rsi, espacio          ; Print newline
     mov rdx, 1
     syscall
+    
+    cmp qword[flag_printOnePhrase], 1
+    je _endPrintFP
+    
+    jmp _continueBoundary
+    
+    _skipLinePLTE:				; CHEQUEO por si no se necesita el print
 
+	mov rdx, r9
+	sub rdx, [lastPrint]        ; Calculate length to print
+	test rdx, rdx               ; Check if length is positive
+	jle _endPrintFP              ; Skip printing if length is not positive
+	syscall 
+
+	_continueBoundary:
     mov [lastPrint], r9       ; Update lastPrint to new position
     xor rax, rax
     mov [wordCount], rax      ; Reset word count
@@ -144,7 +182,7 @@ _endPrintFP:
 _finalizeFP:
     call _enterPrint
     call _enterPrint
-    jmp _manageEdit
+    ret
 
     
 
@@ -153,11 +191,15 @@ _finalizeFP:
 
 ;--------------------- MANEJO DE EDICION DE CODIGO ---------------------
 _manageEdit:
+	mov byte[flag_printOnePhrase],0
+	call _startFullPrint
     mov rax, text_escojaLineaEF
     call _genericprint   
     call _enterPrint
     
     call get_input
+    mov byte[flag_printOnePhrase],1
+    call _startFullPrint
     ret
 
 ;--------------------- MANEJO DE EDICION DE CODIGO ---------------------  
@@ -170,11 +212,11 @@ _startItoa:
     mov r8, rax                     ; Almacena la longitud de la cadena
     
     ; Añade un salto de línea
-    mov byte [buffer + r8], " "
-    inc r8
+    ;mov byte [buffer + r8], 10
+    ;inc r8
     
     ; Termina la cadena con null
-    mov byte [buffer + r8], 0
+    ;mov byte [buffer + r8], 0
 
     ;mov rax, buffer
     
