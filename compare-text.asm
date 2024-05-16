@@ -39,6 +39,7 @@ _start:
         	
     call _readFiles     
 	
+	;Guardar los datos de los buffers
 	mov r9, buffer1
     mov r12, lineLengths
     call store_text
@@ -49,11 +50,14 @@ _start:
 	call store_text
 	mov qword [lineCount2], r10
 	
+	;Llama al compare
 	call compare
 	
+	;Preparacion para el get_input
 	mov r9, buffer1
 	call _genericprint
 	
+	;Llama al bucle de navegacion de lineas
 	call get_input
 
    ; Cerrar
@@ -72,7 +76,7 @@ error_occurred:
 	jmp _finishCode
 
 _openFiles:
-    ; Open the first file
+    ; Abre el primer archivo
     mov rax, 2
     mov rdi, filename1
     xor rsi, rsi
@@ -82,7 +86,7 @@ _openFiles:
     js .error
     mov [file_descriptors], rax
 
-    ; Open the second file
+    ; Abre el segundo archivo
     mov rax, 2
     mov rdi, filename2
     xor rsi, rsi
@@ -98,14 +102,14 @@ _openFiles:
     ret
 
 _readFiles:
-    ; Read the first file
+    ; Lee el primer archivo
     mov rax, 0
     mov rdi, [file_descriptors]
     mov rsi, buffer1
     mov rdx, 2050
     syscall
 
-    ; Read the second file
+    ; Lee el segundo archivo
     mov rax, 0
     mov rdi, [file_descriptors+8]
     mov rsi, buffer2
@@ -123,12 +127,12 @@ compare:
 	xor r8, r8
 	xor rsi, rsi
 	xor r14, r14
-	mov byte [diff_flag], 0
+	mov byte [diff_flag], 0 ; Bandera de diferencia
 	mov rax, 0 ;Contador de indice del buffer1
 	mov rsi, 0 ;Contador de indice del buffer2
 	mov rdx, 0 ;Num de chars en LineLengths
 	mov rcx, 0 ;Num de chars en LineLengths2
-	mov r8, 0  ;Conatdor de los chars
+	mov r8, 0  ;Contador de los chars
 	
 	mov rbx, qword[lineCount]
 	cmp rbx, qword[lineCount2]
@@ -143,37 +147,38 @@ establish_lineCount:
 
 compare_loop_lines:
 	cmp rbx, r15
-	je textos_iguales
+	je textos_iguales ;Los textos son iguales
 	
-	mov rdx, [lineLengths + rbx * 8]
-	mov rcx, [lineLengths2 + rbx * 8]
+	mov rdx, [lineLengths + rbx * 8]  ; Obtiene el lenght del array lineLengths
+	mov rcx, [lineLengths2 + rbx * 8] ; Obtiene el lenght del array lineLengths2
 	
-	cmp rdx, rcx
-	jne diferencia_lineas_count
-	jmp compare_loop_chars
+	cmp rdx, rcx                      ; Compara los lengths de ambas lineas
+	jne diferencia_lineas_count       ; Si son diferentes va a diferencia_lineas_count que es para cuando las lineas tienen distintos tamanos
+	jmp compare_loop_chars            ; Si no continua el ciclo
 
 cont_compare_loop:
-	mov r8, 0
-	inc rbx
+	mov r8, 0                         ; Limpia r8
+	inc rbx                           ; Aumenta contador
 	jmp compare_loop_lines
 
 compare_loop_chars:
-	cmp r8, rdx
-	je cont_compare_loop
+	cmp r8, rdx                       ; Compara el contador de caracteres con el tamano de la linea
+	je cont_compare_loop              ; Son iguales salta a cont_compare_loop
 	
-	mov r10b, byte[buffer1 + rax]
-	mov r11b, byte[buffer2 + rsi]
+	mov r10b, byte[buffer1 + rax]     ; Carga un byte del buffer1 en el registro
+	mov r11b, byte[buffer2 + rsi]     ; Carga un byte del buffer2 en el registro
 	
 	cmp r10b, r11b
 	jne diferencia_lineas
 	
-	inc rax
-	inc rsi
-	inc r8
+	inc rax                           ; Incrementa el indice del buffer1
+	inc rsi                           ; Incrementa el indice del buffer2
+	inc r8                            ; Incrementa el contador de caracteres
 	jmp compare_loop_chars
 
 diferencia_lineas:
 	mov byte [diff_flag], 1
+	; Guarda los registros en pila
 	push rax
 	push rbx
 	push rcx
@@ -183,7 +188,7 @@ diferencia_lineas:
 	push r14
 	mov rax, line_diff_message
 	call _genericprint2
-	mov rcx, rbx
+	mov rcx, rbx                      ; Carga el contador de lineas
 	call _startItoa
 	pop r14
 	pop rsi
@@ -193,12 +198,12 @@ diferencia_lineas:
 	pop rbx
 	pop rax
 	
-	inc rbx
-	inc r8
-	sub r8, rdx
-	neg r8
-	add rax, r8
-	add rsi, r8
+	inc rbx                        ; Incrementa el contador de lineas
+	inc r8                         ; Incrementa el contador de caracteres
+	sub r8, rdx                    ; Ajusta r8 restando el tamao de la linea actual
+	neg r8						   ; Cambia signo de r8 a positivo
+	add rax, r8                    ; Ajusta indice de buffer1
+	add rsi, r8                    ; Ajusta indice de buffer2
 	mov r8, 0
 	jmp compare_loop_lines
 
@@ -223,14 +228,14 @@ diferencia_lineas_count:
 	pop rbx
 	pop rax
 	
-	inc rbx
-	add rax, rdx
-	add rsi, rcx
+	inc rbx                          ; Incrementa el contador de lineas
+	add rax, rdx                     ; Ajusta indice de buffer1
+	add rsi, rcx                     ; Ajusta indice de buffer2
 	jmp compare_loop_lines
 
 textos_iguales:
-	cmp byte[diff_flag], 1
-	je diferencias_encontradas
+	cmp byte[diff_flag], 1           ; Si la bandera esta encendida salta salta a diferencias_encontradas
+	je diferencias_encontradas       
 	
 	mov rax, same_text
 	call _genericprint2
@@ -467,7 +472,7 @@ last_line:
 ;----------------------ITOA
 _startItoa:
 	mov rdi, bufferItoa
-    mov rsi, rcx 
+    mov rsi, rcx 	  ; Numero a convertir en rcx
     mov rbx, 10       ; La base
     call itoa
     mov r8, rax
