@@ -12,7 +12,7 @@ section .data
 	
 
 section .bss
-	user_input resb 5 
+	user_input resb 2050
     lineCount resq 1          ; Initialize line count
     printCont resq 1          ; Initialize print content count
     wordCount resq 1          ; Initialize word count
@@ -93,30 +93,19 @@ _checkWordBoundaryFP:
     cmp byte[flag_printOnePhrase], 0
     je _firstcontinueBoundary
 
-    
-    
-    mov rax, user_input ; Load '1' from userInput into AL
-    ;mov rbx, [buffer]    ; Load '1' from buffer into BL
-    ;mov rsi, rbx
-    call _genericprint
-    
-    xor rax, rax
-    mov rax, testInput ; Load '1' from userInput into AL
-    ;mov rbx, [buffer]    ; Load '1' from buffer into BL
-    ;mov rsi, rbx
-    call _genericprint
-    xor rax, rax
-    mov rax, user_input ; Load '1' from userInput into AL
-    
-    cmp rax, [testInput]
+
+    mov rax, [buffer] ; Load '1' from userInput into AL
+    mov rbx, [user_input]    ; Load '1' from buffer into BL
+
+    cmp rax, rbx
     jne _skipLinePLTE
     
     _firstcontinueBoundary:
-    ;mov rax, 1
-    ;mov rdi, 1
-    ;mov rsi, buffer
-    ;mov rdx, 5              ; Number of characters from lastPrint to current position
-    ;syscall
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, buffer
+    mov rdx, 5              ; Number of characters from lastPrint to current position
+    syscall
 
 
 	mov rax, 1                  ; syscall: write
@@ -134,8 +123,8 @@ _checkWordBoundaryFP:
     mov rdx, 1
     syscall
     
-    cmp qword[flag_printOnePhrase], 1
-    je _endPrintFP
+    cmp byte[flag_printOnePhrase], 1
+    je _finishGenericLoop
     
     jmp _continueBoundary
     
@@ -211,12 +200,22 @@ _startItoa:
     call itoa
     mov r8, rax                     ; Almacena la longitud de la cadena
     
-    ; Añade un salto de línea
-    ;mov byte [buffer + r8], 10
-    ;inc r8
+    ;Añade un salto de línea
+    cmp byte[flag_printOnePhrase], 0
+    jne _continueitoaNS
+    mov byte [buffer + r8], ' '
+    inc r8
+    jmp _enditoa
+    
+    
+    _continueitoaNS:
+    mov byte [buffer + r8], 10
+    inc r8
+    
+    _enditoa:
     
     ; Termina la cadena con null
-    ;mov byte [buffer + r8], 0
+    mov byte [buffer + r8], 0
 
     ;mov rax, buffer
     
@@ -293,5 +292,6 @@ _finishCode:
 	mov rdi, 0
 	syscall
 
-
+_finishGenericLoop:
+	ret
 
