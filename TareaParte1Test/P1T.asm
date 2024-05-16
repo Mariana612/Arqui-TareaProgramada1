@@ -21,7 +21,9 @@ section .bss
     wordCount resq 1          ; Initialize word count
     lastPrint resq 1          ; Pointer to start of last printed word
     lenPrint resq 1
+    lenFirstPart resq 1
     sumPrint resq 1
+    new_text resb 2050 ; Buffer para el texto final.
     
     buffer resb 2050
 
@@ -65,17 +67,21 @@ menu_compare:
 _startFullPrint:
     mov r9, text_start        ; Pointer to start of the text
     mov [lastPrint], r9       ; Initialize lastPrint to start of text
+    
+    
 
 _fullPrint:
     xor rax, rax              ; Clear rax
     mov qword [lineCount], 0    	; Inicializar contador de líneas
     mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
     mov qword [wordCount], 0
+    mov qword[lenFirstPart], -1
 
 _printLoopFP:
     mov cl, [r9]
     test cl, cl
     jz _endPrintFP              ; End if NULL character is reached
+    inc qword[lenFirstPart]
 
     cmp cl, ' '
     je _checkWordBoundaryFP
@@ -212,8 +218,15 @@ _manageEdit:
     mov byte[flag_printOnePhrase],1
     call _startFullPrint
     call get_input
+    
+    mov rdi, rax      ; Use rax (bytes read) to calculate the index of the last byte
+    dec rdi           ; Adjust for zero-based index
+    mov byte [rsi + rdi], 0 ; Null-terminate the string at the newline characte
+    
     call _getInputInfo
+    mov byte[flag_printOnePhrase],0
     call _editText
+    
     ret
 
 _getInputInfo:
@@ -243,11 +256,45 @@ _getInputInfo:
 	call _genericprint
 	
 	;----------- fin linea
+	mov rsi, [lenFirstPart]
+	call _startItoa
+	
+	mov rax, buffer
+	call _genericprint
+	
+
 	ret
 	
  
     
 _editText:
+    ; Copia la primera parte al buffer nuevo
+    mov r8, [lenFirstPart] 
+    sub r8, [lenPrint]
+    
+    mov rsi, text_start
+    mov rdi, new_text
+    mov rcx, r8 ; Termina la primera línea más un espacio
+    rep movsb
+
+    ; Añade text_test
+    mov rsi, user_input
+    mov rcx, [lenUserText]  ; Longitud de 'xd ' sin contar el null terminator
+    rep movsb
+    
+
+	mov r9, [lenStartingText]
+	sub r9, [lenFirstPart]
+	
+	mov rsi, text_start
+    add rsi, [lenFirstPart]  ; Salta la primera y segunda línea
+    mov rcx, r9 ; Longitud total menos lo ya copiado
+    rep movsb
+
+    mov rax, new_text
+    call _genericprint
+
+	ret
 
 
 ;--------------------- MANEJO DE EDICION DE CODIGO ---------------------  
