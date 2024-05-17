@@ -1,14 +1,14 @@
 section .data
     text_start db 'hola me llamo sandia carrasco y me gusta las sandia amarrilla no la roja es que la roja es fea, ademas la gente solo piensa en la sandia roja esto es una palabra por favor me gusta holi.', 0
 	;-- Edit file
-	text_escojaLineaEF  db 'Por favor seleccione la linea que desea modificar',0
+	text_escojaLineaEF  db 'Por favor seleccione la linea que desea modificar: ',0
 	flag_printOnePhrase db 0
 	lentext dq 0 
 	lenUserText dq 0
 	lenStartingText dq 0
 	
 	;--Manejo Dinamico Files
-	text_ingreseDocumento db 'Ingrese la direccion de un Documento', 0xa, 0
+	text_ingreseDocumento db 'Ingrese la direccion de un Documento: ', 0xa, 0
 	
     ; DECORACIONES
     deco1 db '  =================================================$', 0xa, 0
@@ -33,7 +33,8 @@ section .data
     filename2 db 'input2.txt', 0
     line_num dq 1
     ; MENSAJES DE AYUDA
-    error_message db 'Failed to open file.', 0xa, 0
+    error_message db 'Archivo no se pudo abrir', 0xa, 0
+    error_message_size db 'Archivo muy grande', 0xa, 0
     line_message_up db '----No hay una línea anterior----', 0xa, 0
     line_message_down db '----Fin del documento----', 0xa, 0
     same_text db '----El texto no tiene diferencias----', 0xa, 0
@@ -43,24 +44,26 @@ section .data
     espacio db 10
     new_line db 0xa, 0
     clear_screen db 0x1B, '[2J', 0x1B, '[H' ; Combine clear screen and cursor to top-left
+    statbuf  times 144 db 0
     ; FLAGS
     null_flag db 0
     diff_flag db 0
 	
 section .bss
 	user_input resb 2050
+	user_input_line resb 2050
     lastPrint resq 1          ; Pointer to start of last printed word
     lenPrint resq 1
     lenFirstPart resq 1
     sumPrint resq 1
-    new_text resb 2050 ; Buffer para el texto final.
-    buffer resb 2050
+    new_text resb 4097 ; Buffer para el texto final.
+    buffer resb 4097
 	
     ; BUFFERS PARA GUARDAR VARIABLES
-    buffer1 resb 2050
-    buffer2 resb 2050
-    bufferItoa resb 2050
-    bufferNum resb 2050
+    buffer1 resb 4097
+    buffer2 resb 4097
+    bufferItoa resb 4097
+    bufferNum resb 4097
     ; CONTADORES
     wordCount resq 1                 ; Counter for words
     lineCount resq 1                 ; Counter for lines
@@ -75,7 +78,9 @@ section .bss
     lineLengths2 resq 10
     ; EXTRAS
     file_descriptors resq 2 
-    readFileBuffer resb 2050
+    readFileBuffer resb 4097
+    fd resd 1                          ; File descriptor
+    filesize resq 1                    ; Variable to store the file size
     
 section .text
     global _start
@@ -113,11 +118,6 @@ _start:
 
     call get_input_initial		; Input del usuario
 ;--------------------------------------------------------
-
-error_occurred:				; Error de file           
-	mov rax, error_message
-	call _genericprint
-	jmp _finishCode
 
 _openFiles:					; Abrir archivo
     ; Abre el primer archivo
@@ -459,7 +459,7 @@ _checkWordBoundaryFP:
 
 
     mov rax, [buffer] ; Load '1' from userInput into AL
-    mov rbx, [user_input]    ; Load '1' from buffer into BL
+    mov rbx, [user_input_line]    ; Load '1' from buffer into BL
 
     cmp rax, rbx
     jne _skipLinePLTE
@@ -519,7 +519,7 @@ _endPrintFP:
     je _firstcontinueEP
 
     mov rax, [buffer] ; Load '1' from userInput into AL
-    mov rbx, [user_input]    ; Load '1' from buffer into BL
+    mov rbx, [user_input_line]    ; Load '1' from buffer into BL
 
     cmp rax, rbx
     jne _finishSpecialFP
@@ -560,15 +560,15 @@ _finishSpecialFP:
 
 _manageEdit:
 	mov byte[flag_printOnePhrase],0
-	mov r9, text_start 
+	mov r9, readFileBuffer 
 	call _startFullPrint
     mov rax, text_escojaLineaEF
     call _genericprint   
     call _enterPrint
     
-    call get_input
+    call get_input_line
     mov byte[flag_printOnePhrase],1
-    mov r9, text_start 
+    mov r9, readFileBuffer 
     call _startFullPrint
     call get_inputSPECIAL
     
@@ -579,14 +579,14 @@ _manageEdit:
     ret
 
 _getInputInfo:
-	mov rdi, user_input 
+	mov rdi, user_input_line
 	call _calculate_size
 	
 	mov rax, qword[lentext]
 	mov qword[lenUserText], rax
 	
 	;---- texto original
-	mov rdi, text_start 
+	mov rdi, readFileBuffer
 	call _calculate_size
 	
 	mov rax, qword[lentext]
@@ -597,7 +597,7 @@ _getInputInfo:
 get_inputSPECIAL:
     mov rax, 0         ; syscall number for read
     mov rdi, 0         ; file descriptor 0 (stdin)
-    mov rsi, user_input; buffer to store the input
+    mov rsi, user_input_line; buffer to store the input
     add rsi, 1         ; Adjust buffer pointer to leave space for the space character
     mov rdx, 2049      ; reduce max bytes by one to account for the space at the start
     syscall            ; perform the syscall
@@ -622,13 +622,13 @@ _editText:
     mov r8, [lenFirstPart] 
     sub r8, [lenPrint]
     
-    mov rsi, text_start
+    mov rsi, readFileBuffer
     mov rdi, new_text
     mov rcx, r8 ; Termina la primera línea más un espacio
     rep movsb
 
     ; Añade text_test
-    mov rsi, user_input
+    mov rsi, user_input_line
     mov rcx, [lenUserText]  ; Longitud de 'xd ' sin contar el null terminator
     rep movsb
     
@@ -636,7 +636,7 @@ _editText:
 	mov r9, [lenStartingText]
 	sub r9, [lenFirstPart]
 	
-	mov rsi, text_start
+	mov rsi, readFileBuffer
     add rsi, [lenFirstPart]  ; Salta la primera y segunda línea
     mov rcx, r9 ; Longitud total menos lo ya copiado
     rep movsb
@@ -779,14 +779,16 @@ ver_archivo:
     mov rdx, 1
     syscall
     
-    call _openFiles	
-
-    cmp rax, -2
-    je error_occurred   	
-        	
-    call _readFiles
+    call _manageDinamicFile
     
-    mov r9, buffer1
+    ;call _openFiles	
+
+    ;cmp rax, -2
+    ;je error_occurred   	
+        	
+    ;call _readFiles
+    
+    mov r9, readFileBuffer
 	call _print_ver
 	
 	call get_input_ver
@@ -811,6 +813,8 @@ editar_archivo:
     mov rsi, espacio
     mov rdx, 1
     syscall
+    
+    call _manageDinamicFile
     
     call _manageEdit
     
@@ -837,12 +841,12 @@ comparar_archivos:
     mov rdx, 1
     syscall
     
-    call _openFiles	
+    ;call _openFiles	
 
-    cmp rax, -2
-    je error_occurred   	
+    ;cmp rax, -2
+    ;je error_occurred   	
         	
-    call _readFiles
+    ;call _readFiles
     
     ;Guardar los datos de los buffers
 	mov r9, buffer1
@@ -1096,7 +1100,7 @@ itoa:
     mov rax, rsi                    ; Devuelve la longitud de la cadena
     ret
 ;-------------Fin Itoa---------------------------
-;------------------------------------------------------ MANEJO DE ARCHIVOS DINAMICOS
+;------------------------------------------------------ MANEJO DE ARCHIVOS DINÁMICOS
 _manageDinamicFile:
 	mov rax, text_ingreseDocumento
 	call _genericprint
@@ -1108,11 +1112,37 @@ _manageDinamicFile:
     call _openFile			; Abre el archivo a leer
     cmp rax, -2         	; Comprobar si hay error al abrir el archivo
     je _finishErrorCode   	; Si eax es -1, se produjo un error
+    mov [fd], eax ; store file descriptor
 
+file_stats:    
+    push rax
+    ; Get file statistics
+    mov rax, 5                          ; syscall number for fstat (5)
+    mov rdi, [fd]                       ; file descriptor
+    mov rsi, statbuf                    ; pointer to buffer
+    syscall                             ; invoke syscall
+    test rax, rax                       ; check if result is non-negative
+    js _finishErrorCode                 ; jump to error if negative (fstat failed)
+    
+    ; Extract the file size (off_t st_size is at offset 48 in the struct stat)
+    mov rax, [statbuf + 48]             ; read st_size from struct stat
+    mov [filesize], rax                 ; store the file size
+    
+    ; Check if file size is greater than 4096
+    cmp rax, 4096                       ; compare file size with 4096
+    jle file_ok                         ; if less or equal, file is ok
+    jmp file_too_large                  ; otherwise, file is too large
+
+file_ok:
+    pop rax
     mov rsi, rax        	; Guardar el descriptor del archivo en esi
-    call _readFile
-              
+    call _readFile  
     ret
+
+file_too_large:
+    mov rax, error_message
+	call _genericprint
+	jmp _finishCode
     
 get_input:
     mov rax, 0
@@ -1121,6 +1151,14 @@ get_input:
     mov rdx, 2050
     syscall
     ret
+
+get_input_line:
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, user_input_line
+    mov rdx, 2050
+    syscall
+    ret    
 
 _openFile:
     mov rax, 2              ; sys_open syscall
@@ -1134,11 +1172,16 @@ _readFile:
 	mov rax, 0              ; Para leer el documento
 	mov rdi, rsi             
 	mov rsi, readFileBuffer         ; Pointer a buffer
-	mov rdx, 2050           ; Tamano
+	mov rdx, 4097           ; Tamano
 	syscall
 	ret
 
-;------------------------------------------------------ END MANEJO DE ARCHIVOS DINAMICOS
+_finishErrorCode:				; Error de file           
+	mov rax, error_message
+	call _genericprint
+	jmp _finishCode
+
+;------------------------------------------------------ END MANEJO DE ARCHIVOS DINÁMICOS
 
 _calculate_size:
     push rdi    ; Guarda el valor original de RDI
