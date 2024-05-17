@@ -50,8 +50,8 @@ section .data
     diff_flag db 0
 	
 section .bss
-	user_input resb 2050
-	user_input_line resb 2050
+	user_input resb 4097
+	user_input_line resb 4097
     lastPrint resq 1          ; Pointer to start of last printed word
     lenPrint resq 1
     lenFirstPart resq 1
@@ -83,6 +83,8 @@ section .bss
     file_descriptors resq 2 
     fd resd 1                          ; File descriptor
     filesize resq 1                    ; Variable to store the file size
+    dynamicFile resb 4097
+    file_desc resb 8 
     
 section .text
     global _start
@@ -1102,13 +1104,39 @@ itoa:
     ret
 ;-------------Fin Itoa---------------------------
 ;------------------------------------------------------ MANEJO DE ARCHIVOS DINÁMICOS
+_manageEditDinamicFile:
+	;mov rax, text_modify
+	;call _genericprint
+	
+	;call get_input
+	
+	mov rdi, user_input 
+	call _calculate_size
+	
+	mov rsi, qword[lentext]
+	call _startItoa
+	
+	mov rax, buffer
+	call _genericprint
+	
+	call _openFileToEdit
+	call _writeToFile
+	call _closeFile
+	
+	mov rdi, user_input
+    call clear_input
+	ret
+	
 _manageDinamicFile:
 	mov rax, text_ingreseDocumento
 	call _genericprint
 	
 	call get_input
 	dec rax            
-    mov byte [rsi + rax], 0 
+    mov byte [rsi + rax], 0
+    
+    lea rdi, [dynamicFile]     ; Destino: dirección de inicio de filename
+	call copy_string 
 	
     call _openFile			; Abre el archivo a leer
     cmp rax, -2         	; Comprobar si hay error al abrir el archivo
@@ -1138,6 +1166,9 @@ file_ok:
     pop rax
     mov rsi, rax        	; Guardar el descriptor del archivo en esi
     call _readFile  
+    
+    mov rdi, user_input
+    call clear_input
     ret
 
 file_too_large:
@@ -1149,7 +1180,7 @@ get_input:
     mov rax, 0
     mov rdi, 0
     mov rsi, user_input
-    mov rdx, 2050
+    mov rdx, 4097
     syscall
     ret
 
@@ -1157,7 +1188,7 @@ get_input_line:
     mov rax, 0
     mov rdi, 0
     mov rsi, user_input_line
-    mov rdx, 2050
+    mov rdx, 4097
     syscall
     ret    
 
@@ -1176,7 +1207,50 @@ _readFile:
 	mov rdx, 4097           ; Tamano
 	syscall
 	ret
+	
+clear_input:    ; Start address of user_input
+    mov rcx, 4097          ; Size of user_input in bytes
+    xor rax, rax           ; Set rax to 0 (value to set)
+    rep stosb              ; Repeat storing AL into memory at RDI, RCX times
+    ret
 
+; Abre el archivo para escritura y truncamiento
+_openFileToEdit:
+    mov rax, 2               ; sys_open syscall number
+    lea rdi, [dynamicFile]      ; Address of filename
+    mov rsi, 0201h           ; Flags: O_WRONLY | O_TRUNC (open for writing and truncate)
+    mov rdx, 0666h           ; Permissions: rw-rw-rw- (if the file needs to be created)
+    syscall                  ; Perform the syscall
+    mov [file_desc], rax     ; Store the file descriptor in a memory location
+    ret
+
+; Escribe en el archivo
+_writeToFile:
+    mov rax, 1               ; sys_write syscall number
+    mov rdi, [file_desc]     ; Load the stored file descriptor into rdi
+    lea rsi, [user_input]    ; Address of data to write
+    mov rdx, qword[lentext]       ; Length of data to write
+    syscall                  ; Perform the syscall
+    ret
+
+; Cierra el archivo
+_closeFile:
+    mov rax, 3               ; sys_close syscall number
+    mov rdi, [file_desc]     ; Load the stored file descriptor into rdi
+    syscall                  ; Perform the syscall
+    ret
+    
+copy_string:
+	lea rdi, [dynamicFile]     ; Destino: dirección de inicio de filename
+    lea rsi, [user_input]   ; Fuente: dirección de inicio de user_input
+    mov rcx, 2050           ; Número máximo de caracteres a copiar
+    rep movsb
+    
+
+    ret
+	
+	
+    
 _finishErrorCode:				; Error de file           
 	mov rax, error_message
 	call _genericprint

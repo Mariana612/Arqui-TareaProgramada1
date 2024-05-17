@@ -13,7 +13,7 @@ section .bss
 	file_desc resb 8 
 	readFileBuffer resb 2050
 	user_input resb 2050
-	filename resb 2050
+	dynamicFile resb 2050
 	buffer resb 4097
 
 section .text
@@ -68,7 +68,7 @@ _manageDinamicFile:
 	dec rax            
     mov byte [rsi + rax], 0 
 	
-	lea rdi, [filename]     ; Destino: dirección de inicio de filename
+	
 	call copy_string
 	
     call _openFile			; Abre el archivo a leer
@@ -144,7 +144,7 @@ clear_input:    ; Start address of user_input
 
 ; Función para copiar cadenas de caracteres usando instrucciones de string
 copy_string:
-
+	lea rdi, [filename]     ; Destino: dirección de inicio de filename
     lea rsi, [user_input]   ; Fuente: dirección de inicio de user_input
     mov rcx, 2050           ; Número máximo de caracteres a copiar
     rep movsb
