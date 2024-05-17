@@ -64,6 +64,9 @@ section .bss
     buffer2 resb 4097
     bufferItoa resb 4097
     bufferNum resb 4097
+    readFileBuffer resb 4097
+    compareText1 resb 4097
+    compareText2 resb 4097
     ; CONTADORES
     wordCount resq 1                 ; Counter for words
     lineCount resq 1                 ; Counter for lines
@@ -78,7 +81,6 @@ section .bss
     lineLengths2 resq 10
     ; EXTRAS
     file_descriptors resq 2 
-    readFileBuffer resb 4097
     fd resd 1                          ; File descriptor
     filesize resq 1                    ; Variable to store the file size
     
@@ -841,12 +843,18 @@ comparar_archivos:
     mov rdx, 1
     syscall
     
-    ;call _openFiles	
+    call _manageDinamicFile
+    lea rsi, [readFileBuffer]   ; Fuente: dirección de inicio de user_input
+    mov rcx, 4097           ; Número máximo de caracteres a copiar
+    lea rdi, [buffer1]     ; Destino: dirección de inicio de filename
+    rep movsb
+    
+    call _manageDinamicFile
+    lea rsi, [readFileBuffer]   ; Fuente: dirección de inicio de user_input
+    mov rcx, 4097           ; Número máximo de caracteres a copiar
+    lea rdi, [buffer2]     ; Destino: dirección de inicio de filename
+    rep movsb
 
-    ;cmp rax, -2
-    ;je error_occurred   	
-        	
-    ;call _readFiles
     
     ;Guardar los datos de los buffers
 	mov r9, buffer1
@@ -861,15 +869,8 @@ comparar_archivos:
 	
 	;Llama al compare
 	call compare
-	
-	; Cerrar
-    mov rax, 3
-    mov rdi, [file_descriptors]
-    syscall
-    mov rdi, [file_descriptors+8]
-    syscall
     
-    call get_input_comp
+    jmp get_input_comp
     
 ;---------------------------------------------- LEER INPUT DE MENÚ EDITAR ARCHIVO
 get_input_edit:
