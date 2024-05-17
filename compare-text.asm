@@ -1,14 +1,14 @@
 section .data
-    text_start db 'hola me llamo sandia carrasco y me gusta las sandia amarrilla no la roja es que la roja es fea, ademas la gente solo piensa en la sandia roja esto es una palabra por favor me gusta holi.', 0
 	;-- Edit file
 	text_escojaLineaEF  db 'Por favor seleccione la linea que desea modificar: ',0
-	text_documentoEditado  db 'El documento ha sido editado correctamente',10,'Gracias por utilizar el editior de archivos.',10,0
+	text_documentoEditado  db 'El documento ha sido editado correctamente',10,'Gracias por utilizar el editor de archivos.',10,0
 	flag_printOnePhrase db 0
 	lentext dq 0 
 	lenUserText dq 0
 	lenStartingText dq 0
 	text_errorInsert db 'Error: Se selecciono una linea que no existe', 0
 	text_debugging db 'Debug', 0
+	digits db '0123456789ABCDEF' 
 	
 	;--Manejo Dinamico Files
 	text_ingreseDocumento db 'Ingrese la direccion de un Documento: ', 0xa, 0
@@ -26,8 +26,8 @@ section .data
     ; INSTRUCCIONES
     instruction_initial1 db '----- Presionar: v = Ver archivo, e = Editar archivo -----', 0xa, 0
     instruction_initial2 db '   -----    c = Comparar 2 archivos, s = Salir -----   ', 0xa, 0
-    instruction_scroll1 db '----- Presionar: u = Ir a línea anterior, d = Siguiente línea -----', 0xa, 0
-    instruction_scroll2 db '-- h = Ver texto en hexadecimal, q = Regresar al menú principal --', 0xa, 0
+    instruction_scroll1 db '----- Presionar: o = Ver texto, h = Ver texto entero en hexadecimal, q = Regresar al menú principal -----', 0xa, 0
+    instruction_scroll2 db '----- Presionar: u = Ir a línea anterior, d = Siguiente línea, q = Regresar al menú principal -----', 0xa, 0
     instruction_edit db '----- Presionar: u = Ir a línea anterior, d = Siguiente línea -----', 0xa, 0
     instruction_compare db '----- Presionar: q = Regresar al menú principal -----', 0xa, 0
     option db '--Ingresar opción: ', 0
@@ -70,6 +70,8 @@ section .bss
     readFileBuffer resb 4097
     compareText1 resb 4097
     compareText2 resb 4097
+    bin_num resb 4097
+    hex_result resb 4097
     ; CONTADORES
     wordCount resq 1                 ; Counter for words
     lineCount resq 1                 ; Counter for lines
@@ -77,6 +79,7 @@ section .bss
     ; INPUTS
     user_input_edit resb 2           	 ; Buffer to store user input
     user_input_comp resb 2           	 ; Buffer to store user input
+    user_input_choose resb 2           	 ; Buffer to store user input
     user_input_scroll resb 2           	 ; Buffer to store user input
     user_input_initial resb 2           	 ; Buffer to store user input
     ; ARRAYS
@@ -895,20 +898,15 @@ ver_archivo:
     call _genericprint
     
     ; Imprimir un enter
-   call _enterPrint
+    call _enterPrint
     
     mov rax, instruction_scroll1
-    call _genericprint
-    mov rax, instruction_scroll2
     call _genericprint
     
     ; Imprimir un enter
     call _enterPrint
     
     call _manageDinamicFile
-    
-    mov r9, readFileBuffer
-	call _print_ver
 	
 	call get_input_ver
 
@@ -1048,33 +1046,54 @@ get_input_comp:
     jmp get_input_comp            		; Se repite el loop para seguir leyendo los inputs
     
 ;---------------------------------------------- LEER INPUT DE MENÚ VER ARCHIVO
-get_input_ver:
+get_input_ver:   
     mov rax, 0
     mov rdi, 0
-    mov rsi, user_input_scroll
+    mov rsi, user_input_choose
     mov rdx, 2
     syscall
 
 	; Comparar el input a las letras
-    cmp byte[user_input_scroll], 'u'		; Up, se mueve una línea de texto hacia arriba
+    cmp byte[user_input_choose], 'o'		; Down, se mueve una línea de texto hacia arriba
+    je open_text
+    cmp byte[user_input_choose], 'h'		; Hex, ver el texto en hexadecimal
+    je hex_text
+    cmp byte[user_input_choose], 'q'		; Quit, se sale del programa
+    je _start
+	
+    ; Imprimir un enter
+    call _enterPrint
+    
+    mov rax, option_no_valida
+    call _genericprint
+    
+    jmp get_input_ver           		; Se repite el loop para seguir leyendo los inputs
+
+open_text:
+	mov rax, instruction_scroll2
+    call _genericprint
+    
+    call _enterPrint
+    mov r9, readFileBuffer
+	call _print_ver
+
+open_text_cont:
+	
+	mov rax, 0
+    mov rdi, 0
+    mov rsi, user_input_scroll
+    mov rdx, 2
+    syscall
+	
+	cmp byte[user_input_scroll], 'u'		; Up, se mueve una línea de texto hacia arriba
     je move_up
     cmp byte[user_input_scroll], 'd'		; Down, se mueve una línea de texto hacia arriba
     je move_down
     cmp byte[user_input_scroll], 'q'		; Quit, se sale del programa
     je _start
-	
-    ; Imprimir un enter
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, espacio
-    mov rdx, 1
-    syscall
     
-    mov rax, option_no_valida
-    call _genericprint
+    jmp open_text_cont
     
-    jmp get_input_ver            		; Se repite el loop para seguir leyendo los inputs
-
 ; Si se presiona la 'u'
 move_up:
 	mov byte [null_flag], 0
@@ -1102,7 +1121,7 @@ move_up:
     
     call _printLoop_ver					; Se imprime la línea actual
 	
-    jmp get_input_ver					; Se vuelve a pedir el input
+    jmp open_text_cont					; Se vuelve a pedir el input
 
 ; Si se presiona la 'd'
 move_down:
@@ -1128,7 +1147,7 @@ move_down:
     
     call _printLoop_ver
 
-    jmp get_input_ver
+    jmp open_text_cont
 
 ; Cuando se está al incio del texto
 no_prev_line:
@@ -1139,7 +1158,7 @@ no_prev_line:
     mov rdx, 36
     syscall
     
-    jmp get_input_ver
+    jmp open_text_cont
 
 ; Cuando se está al final del texto
 last_line:
@@ -1150,8 +1169,121 @@ last_line:
     mov rdx, 27
     syscall
     
+    jmp open_text_cont
+
+hex_text:
+	mov rdi, readFileBuffer
+    call _calculate_size
+    mov rsi, [lentext]
+    call is_binary
+    
+    cmp rax, 0
+    jne texto_ascii
+	
+	call _enterPrint
+	call _AtoiStart
+    call ascii_to_hex
+    call _enterPrint
+    
     jmp get_input_ver
 
+texto_ascii:
+	mov rax, digits
+	call _genericprint
+    
+	jmp get_input_ver
+
+;---------------COMPARE BINARIO-----------------------------------
+is_binary:
+    xor rcx, rcx      
+
+.loop:
+    cmp rcx, rsi
+    jge .done             
+
+    mov al, [rdi + rcx]
+
+    cmp al, '0'
+    je .next          
+
+    cmp al, '1'
+    je .next
+    
+    cmp al, 10
+    je .next      
+
+    mov rax, 1
+    ret
+
+.next:
+    ; Incrementa el contador
+    inc rcx
+    jmp .loop            
+
+.done:
+    xor rax, rax          ; rax = 0
+    ret
+;---------------COMPARE BINARIO-----------------------------------
+
+;--------------------BIN A HEX-------------------------------------------
+ascii_to_hex:
+    mov rsi, 0                  ; Reset string length counter
+    mov r13, [bin_num]          ; Load the binary number
+    mov rdi, hex_result         ; Point to the result buffer
+    xor r8, r8                  ; Clear loop counter
+
+loop_base16:
+    mov r11, 0xf                ; Mask to extract the lowest 4 bits
+    and r11, r13                ; Extract the 4 least significant bits
+    shr r13, 4                  ; Shift the binary number right by 4 bits
+    mov dl, [digits + r11]      ; Get the corresponding hex digit
+
+store_digit_16:
+    mov [rdi + rsi], dl         ; Store the hex digit in the result string
+    inc rsi                     ; Move to the next position in the string
+    inc r8                      ; Increment the loop counter
+    cmp r8, 1024                ; Check if we've processed 1024 hex digits
+    je final_base_16            ; If so, we're done
+    
+    test r13, r13               ; Check if any bits are left to process
+    jnz loop_base16       ; If there are, continue the loop
+
+final_base_16:
+    mov byte [rdi + rsi], 0     ; Null-terminate the result string
+    mov rdx, rdi
+    lea rcx, [rdi + rsi - 1]
+    call reversetest           ; Reverse the string
+    
+    mov rax, hex_result
+    call _genericprint          ; Print the string
+    ret
+;--------------------START ATOI-------------------------------------------
+
+_AtoiStart:
+    ; Convert binary string to number
+    mov rsi, readFileBuffer       ; Load address of binary string
+    xor rax, rax                  ; Clear rax to use it as the result
+    xor rcx, rcx                  ; Clear rcx to use it as a counter
+
+bin_to_number_loop:
+    mov dl, [rsi + rcx]           ; Load current character
+    cmp dl, 10                     ; Check for null terminator
+    je bin_to_number_done         ; If null terminator, we're done
+    shl qword[bin_num], 1         ; Shift result left by 1 (multiply by 2)
+    cmp dl, '1'                   ; Check if character is '1'
+    jne skip_add_one              ; If not '1', skip addition
+    add qword[bin_num], 1                    ; Add 1 to the result (since current bit is 1)
+
+skip_add_one:
+    inc rcx                       ; Move to the next character
+    jmp bin_to_number_loop        ; Repeat the loop
+
+bin_to_number_done:
+    ret
+    
+_exitFunction: 
+	ret
+;--------------------END ATOI-------------------------------------------
 
 ;-------------------------------- ITOA ---------------------------------
 _startItoa: 
@@ -1197,9 +1329,9 @@ itoa:
 	
 	mov rdx, rdi
 	lea rcx, [rdi + rsi -1]
-	jmp .reversetest
+	jmp reversetest
 
-.reverseloop:
+reverseloop:
     mov al, [rdx]
     mov ah, [rcx]
     mov [rcx], al
@@ -1207,9 +1339,9 @@ itoa:
     inc rdx
     dec rcx
 
-.reversetest:
+reversetest:
     cmp rdx, rcx
-    jl .reverseloop
+    jl reverseloop
 
     mov rax, rsi                    ; Devuelve la longitud de la cadena
     ret
