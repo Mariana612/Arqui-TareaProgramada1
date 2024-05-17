@@ -12,8 +12,9 @@ section .data
 	lentext dq 0 
 	lenUserText dq 0
 	lenStartingText dq 0
-    binary_str db 1011b, 0
+    binary_str db "1111", 0
     decimal_number dd 0
+    
 
 	
 	
@@ -32,7 +33,8 @@ section .bss
     buffer resb 2050
     
     result resb 2050
-    hex_result resb 16
+    bin_num resb 20
+    hex_result resb 2050
 
 section .text
     global _start
@@ -61,15 +63,15 @@ _start:
     
     ;mov rax, buffer
     ;call _genericprint
-	
-   mov rsi, binary_str
-   call ascii_to_hex
+    
+    call _AtoiStart
+	mov qword[bin_num], rax
+    mov rsi, bin_num
+    call ascii_to_hex
    
    ;mov rax, hex_result
    ;call _genericprint
-    
-    
-    
+
     jmp _finishCode
 
 ;-------------- INTERACCION CON EL USUARIO -----------------------
@@ -241,7 +243,9 @@ reversetest2:
 ; bin_to_hex function
 ascii_to_hex:
     mov rsi, 0      				; Cantidad de digitos del string
-    mov r13, [binary_str]
+    mov r13, [bin_num]
+    mov rax, digits
+    call _genericprint
     mov rdi, hex_result
     xor r8, r8  ; Clear R8 to use as a loop counter
 loop_base16_high:
@@ -269,6 +273,30 @@ final_base_16:
 	call _genericprint ;Imprimir el string
 	ret
 ;--------------------END ATOI-------------------------------------------
+
+_AtoiStart:
+	xor rbx, rbx			;reinicia el registro
+	xor rax, rax			;reinicia el registro
+	lea rcx, [binary_str]			;ingresa el numString a rcx
+	jmp _Atoi
+
+_Atoi:
+	mov bl, byte[rcx]
+	cmp bl, 0xA		
+	je _exitFunction		;se asegura de que sea el final del string
+
+	sub rbx,30h			;resta 30h al string para volverlo el numero
+	imul rax, 2 			;multiplica el numero almacenado en rax x 10 para volverlo decimal
+	add rax, rbx			;agrega el ultimo numero obtenido a rax (ej: 10+3=13)
+	jc _finishCode		;check de overflow
+
+
+	xor rbx,rbx			;reinicia el registro
+	inc rcx				;incrementa x 1 el rcx (obtiene el siguiente caracter
+	jmp _Atoi			;realiza loop
+
+_exitFunction: 
+	ret
 
 ;------------------------- GENERIC PRINT -------------------------------
 _genericprint:
