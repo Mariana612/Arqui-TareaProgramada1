@@ -6,6 +6,8 @@ section .data
 	lentext dq 0 
 	lenUserText dq 0
 	lenStartingText dq 0
+	text_errorInsert db 'Error: Se selecciono una linea que no existe', 0
+	text_debugging db 'Debug', 0
 	
 	;--Manejo Dinamico Files
 	text_ingreseDocumento db 'Ingrese la direccion de un Documento: ', 0xa, 0
@@ -53,8 +55,8 @@ section .bss
 	user_input resb 4097
 	user_input_line resb 4097
     lastPrint resq 1          ; Pointer to start of last printed word
-    lenPrint resq 1
-    lenFirstPart resq 1
+    lenPrint resq 4097
+    lenFirstPart resq 4097
     sumPrint resq 1
     new_text resb 4097 ; Buffer para el texto final.
     buffer resb 4097
@@ -603,12 +605,14 @@ _endPrintFP:
     
     cmp byte[flag_printOnePhrase], 0
     je _firstcontinueEP
-
+    
     mov rax, [buffer] ; Load '1' from userInput into AL
     mov rbx, [user_input_line]    ; Load '1' from buffer into BL
+    
+
 
     cmp rax, rbx
-    jne _finishSpecialFP
+    jne _finalizarErrorseleccionFP
     
     _firstcontinueEP:
     mov rax, 1
@@ -627,17 +631,51 @@ _endPrintFP:
     mov rax, 1                ; syscall number for sys_write
     mov rdi, 1                ; file descriptor 1 for stdout
     syscall                   ; Execute the print
-
+    
 _finalizeFP:
+    cmp byte[flag_printOnePhrase], 1
+    je _finishSpecialFP2
+    
+
+
     call _enterPrint
     call _enterPrint
     ret
+    
+_finalizarErrorseleccionFP:
+	call _enterPrint
+	mov rax, text_errorInsert
+	call _genericprint
+	jmp _finishCode
+
    
 _finishSpecialFP:
 	mov rsi, [lastPrint]      ; Get the pointer to the last printed position
     mov rdx, r9               ; Get the current position in text
     sub rdx, rsi
+
     mov qword[lenPrint], rdx
+    
+    
+
+	ret
+	
+_finishSpecialFP2:
+	push rdx
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio          ; Print newline
+    mov rdx, 1
+    syscall
+    pop rdx
+    
+    mov rsi, [lastPrint]      ; Get the pointer to the last printed position
+    mov rdx, r9               ; Get the current position in text
+    sub rdx, rsi
+    
+    inc qword[lenFirstPart]
+    mov qword[lenPrint], rdx
+    
     
 
 	ret
@@ -645,6 +683,7 @@ _finishSpecialFP:
 ;--------------------- MANEJO DE EDICION DE CODIGO ---------------------
 
 _manageEdit:
+	
 	mov byte[flag_printOnePhrase],0
 	mov r9, readFileBuffer 
 	call _startFullPrint
@@ -656,10 +695,13 @@ _manageEdit:
 	call clear_input
 
     call get_input_line
+    
+    
     mov byte[flag_printOnePhrase],1
     mov r9, readFileBuffer 
     call _startFullPrint
     call get_inputSPECIAL
+    
     
     call _getInputInfo
     mov byte[flag_printOnePhrase],0
@@ -680,6 +722,8 @@ _getInputInfo:
 	
 	mov rax, qword[lentext]
 	mov qword[lenStartingText], rax
+	
+	
 
 	ret
 	
@@ -708,13 +752,18 @@ input_done:
     
 _editText:
     ; Copia la primera parte al buffer nuevo
+
+
+	
     mov r8, [lenFirstPart] 
     sub r8, [lenPrint]
     
+
     mov rsi, readFileBuffer
     mov rdi, new_text
     mov rcx, r8 ; Termina la primera línea más un espacio
     rep movsb
+    
 
     ; Añade text_test
     mov rsi, user_input_line
@@ -725,6 +774,7 @@ _editText:
 	mov r9, [lenStartingText]
 	sub r9, [lenFirstPart]
 	
+
 	mov rsi, readFileBuffer
     add rsi, [lenFirstPart]  ; Salta la primera y segunda línea
     mov rcx, r9 ; Longitud total menos lo ya copiado
