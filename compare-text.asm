@@ -7,6 +7,9 @@ section .data
 	lenUserText dq 0
 	lenStartingText dq 0
 	
+	;--Manejo Dinamico Files
+	text_ingreseDocumento db 'Ingrese la direccion de un Documento', 0xa, 0
+	
     ; DECORACIONES
     deco1 db '  =================================================$', 0xa, 0
     deco2 db '||         Editor y Comparador de Archivos         ||$', 0xa, 0
@@ -72,6 +75,7 @@ section .bss
     lineLengths2 resq 10
     ; EXTRAS
     file_descriptors resq 2 
+    readFileBuffer resb 2050
     
 section .text
     global _start
@@ -1030,15 +1034,6 @@ last_line:
     
     jmp get_input_ver
 
-;---------------------------------------------- LEER INPUT DE MANEJAR EDICIÓN
-get_input:
-    mov rax, 0
-    mov rdi, 0
-    mov rsi, user_input
-    mov rdx, 2050
-    syscall
-    ret
-
 
 ;-------------------------------- ITOA ---------------------------------
 _startItoa: 
@@ -1101,6 +1096,49 @@ itoa:
     mov rax, rsi                    ; Devuelve la longitud de la cadena
     ret
 ;-------------Fin Itoa---------------------------
+;------------------------------------------------------ MANEJO DE ARCHIVOS DINAMICOS
+_manageDinamicFile:
+	mov rax, text_ingreseDocumento
+	call _genericprint
+	
+	call get_input
+	dec rax            
+    mov byte [rsi + rax], 0 
+	
+    call _openFile			; Abre el archivo a leer
+    cmp rax, -2         	; Comprobar si hay error al abrir el archivo
+    je _finishErrorCode   	; Si eax es -1, se produjo un error
+
+    mov rsi, rax        	; Guardar el descriptor del archivo en esi
+    call _readFile
+              
+    ret
+    
+get_input:
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, user_input
+    mov rdx, 2050
+    syscall
+    ret
+
+_openFile:
+    mov rax, 2              ; sys_open syscall
+    lea rdi, [user_input]   ; Dirección de la entrada del usuario como nombre del archivo
+    mov rsi, 0              ; O_RDONLY
+    mov rdx, 0              ; Permisos (no necesarios en O_RDONLY)
+    syscall                 ; Ejecuta syscall
+    ret
+
+_readFile:
+	mov rax, 0              ; Para leer el documento
+	mov rdi, rsi             
+	mov rsi, readFileBuffer         ; Pointer a buffer
+	mov rdx, 2050           ; Tamano
+	syscall
+	ret
+
+;------------------------------------------------------ END MANEJO DE ARCHIVOS DINAMICOS
 
 _calculate_size:
     push rdi    ; Guarda el valor original de RDI
