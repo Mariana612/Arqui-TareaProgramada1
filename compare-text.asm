@@ -570,6 +570,9 @@ _manageEdit:
     call _genericprint   
     call _enterPrint
     
+    mov rdi, user_input_line
+	call clear_input
+
     call get_input_line
     mov byte[flag_printOnePhrase],1
     mov r9, readFileBuffer 
@@ -644,13 +647,12 @@ _editText:
     add rsi, [lenFirstPart]  ; Salta la primera y segunda línea
     mov rcx, r9 ; Longitud total menos lo ya copiado
     rep movsb
+    
+    call _manageEditDinamicFile
+    
 
 	mov r9, new_text 
 	call _startFullPrint
-	
-    ;mov rax, new_text
-    ;call _genericprint
-
 	ret
 
 ;---------------------------------------------- PRINT TEXTO LÍNEA POR LÍNEA
@@ -1105,19 +1107,11 @@ itoa:
 ;-------------Fin Itoa---------------------------
 ;------------------------------------------------------ MANEJO DE ARCHIVOS DINÁMICOS
 _manageEditDinamicFile:
-	;mov rax, text_modify
-	;call _genericprint
+	mov rdi, readFileBuffer
+    call clear_input
 	
-	;call get_input
-	
-	mov rdi, user_input 
+	mov rdi,  new_text
 	call _calculate_size
-	
-	mov rsi, qword[lentext]
-	call _startItoa
-	
-	mov rax, buffer
-	call _genericprint
 	
 	call _openFileToEdit
 	call _writeToFile
@@ -1194,7 +1188,7 @@ get_input_line:
 
 _openFile:
     mov rax, 2              ; sys_open syscall
-    lea rdi, [user_input]   ; Dirección de la entrada del usuario como nombre del archivo
+    lea rdi, [dynamicFile]   ; Dirección de la entrada del usuario como nombre del archivo
     mov rsi, 0              ; O_RDONLY
     mov rdx, 0              ; Permisos (no necesarios en O_RDONLY)
     syscall                 ; Ejecuta syscall
@@ -1228,7 +1222,7 @@ _openFileToEdit:
 _writeToFile:
     mov rax, 1               ; sys_write syscall number
     mov rdi, [file_desc]     ; Load the stored file descriptor into rdi
-    lea rsi, [user_input]    ; Address of data to write
+    lea rsi, [new_text]    ; Address of data to write
     mov rdx, qword[lentext]       ; Length of data to write
     syscall                  ; Perform the syscall
     ret
@@ -1244,8 +1238,7 @@ copy_string:
 	lea rdi, [dynamicFile]     ; Destino: dirección de inicio de filename
     lea rsi, [user_input]   ; Fuente: dirección de inicio de user_input
     mov rcx, 2050           ; Número máximo de caracteres a copiar
-    rep movsb
-    
+    rep movsb 
 
     ret
 	
