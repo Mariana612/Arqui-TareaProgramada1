@@ -12,7 +12,7 @@ section .data
 	lentext dq 0 
 	lenUserText dq 0
 	lenStartingText dq 0
-    binary_str db '1011', 0
+    binary_str db 1011b, 0
     decimal_number dd 0
 
 	
@@ -51,21 +51,22 @@ _start:
     ;call get_input
     ;call menu_compare
     
-    mov rdi, binary_str
-    call _calculate_size
-    mov rsi, [lentext]
-    call is_binary
+    ;mov rdi, binary_str
+    ;call _calculate_size
+    ;mov rsi, [lentext]
+    ;call is_binary
     
-    mov rsi, rax
-    call _startItoa
+    ;mov rsi, rax
+    ;call _startItoa
     
-    mov rax, buffer
-    call _genericprint
+    ;mov rax, buffer
+    ;call _genericprint
 	
+   mov rsi, binary_str
    call ascii_to_hex
    
-   mov rax, hex_result
-   call _genericprint
+   ;mov rax, hex_result
+   ;call _genericprint
     
     
     
@@ -239,29 +240,34 @@ reversetest2:
 ;------------------------------ATOI-------------------------------------
 ; bin_to_hex function
 ascii_to_hex:
-    mov rdi, binary_str
-    mov rsi, hex_result
+    mov rsi, 0      				; Cantidad de digitos del string
+    mov r13, [binary_str]
+    mov rdi, hex_result
     xor r8, r8  ; Clear R8 to use as a loop counter
-.loop:
-    movzx r9, byte [rdi + r8] 
-    test r9, r9 ; Check for null terminator
-    jz .done    
+loop_base16_high:
+	mov r11, 0xf
+	and r11, r13 ;Enmascaramiento de los bits menos significativos para obtener los cuatro menores
+	shr r13, 4 ;Se mueven los bits 4 veces a la derecha
+	
+    mov dl, byte [digits + r11] ;Se busca el dígito obtenido en el look up table
 
-    sub r9, '0' ; Convert ASCII character to its numerical value
-    cmp r9, 9   ; Check if it's a digit
-    jbe .is_digit
-    sub r9, 7   ; Adjust for characters 'A' to 'F'
-.is_digit:
-    ; Convert binary number to hexadecimal
-    mov r11, 0xf ; Mask to isolate lower 4 bits
-    and r11, r9 ; Mask lower 4 bits
-    mov dl, byte [digits + r11] ; Get corresponding hexadecimal digit from lookup table
-    mov [rsi + r8], dl ; Store hexadecimal digit in output string
-    inc r8  ; Increment loop counter
-    jmp .loop   ; Repeat for next character
-.done:
-    ret
+store_digit_16_high:
+    mov [rdi + rsi], dl  ;Almacena el caracter en el string
+    inc rsi             ;Se mueve a la siguiente posición del string
+    inc r8 ;Se incrementa el contador
+    cmp r8, 1024 ;Se pregunta si ya se hicieron la cantidad de agrupaciones máxima
+	je final_base_16
+		
+	jmp loop_base16_high	
 
+final_base_16:
+	mov rdx, rdi
+    lea rcx, [rdi + rsi - 1]
+    call reversetest2 ;Darle vuelta al string
+    
+    mov rax, hex_result
+	call _genericprint ;Imprimir el string
+	ret
 ;--------------------END ATOI-------------------------------------------
 
 ;------------------------- GENERIC PRINT -------------------------------
