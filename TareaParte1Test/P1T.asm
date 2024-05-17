@@ -12,7 +12,7 @@ section .data
 	lentext dq 0 
 	lenUserText dq 0
 	lenStartingText dq 0
-    binary_str db "1111", 0
+    binary_str db "10101010101111010101", 0
     decimal_number dd 0
     
 
@@ -33,7 +33,7 @@ section .bss
     buffer resb 2050
     
     result resb 2050
-    bin_num resb 20
+    bin_num resb 4097
     hex_result resb 2050
 
 section .text
@@ -65,8 +65,7 @@ _start:
     ;call _genericprint
     
     call _AtoiStart
-	mov qword[bin_num], rax
-    mov rsi, bin_num
+	mov [bin_num], rax
     call ascii_to_hex
    
    ;mov rax, hex_result
@@ -242,58 +241,60 @@ reversetest2:
 ;------------------------------ATOI-------------------------------------
 ; bin_to_hex function
 ascii_to_hex:
-    mov rsi, 0      				; Cantidad de digitos del string
-    mov r13, [bin_num]
-    mov rax, digits
-    call _genericprint
-    mov rdi, hex_result
-    xor r8, r8  ; Clear R8 to use as a loop counter
+    mov rsi, 0                  ; Reset string length counter
+    mov r13, [bin_num]          ; Load the binary number
+    mov rdi, hex_result         ; Point to the result buffer
+    xor r8, r8                  ; Clear loop counter
+
 loop_base16_high:
-	mov r11, 0xf
-	and r11, r13 ;Enmascaramiento de los bits menos significativos para obtener los cuatro menores
-	shr r13, 4 ;Se mueven los bits 4 veces a la derecha
-	
-    mov dl, byte [digits + r11] ;Se busca el dígito obtenido en el look up table
+    mov r11, 0xf                ; Mask to extract the lowest 4 bits
+    and r11, r13                ; Extract the 4 least significant bits
+    shr r13, 4                  ; Shift the binary number right by 4 bits
+    mov dl, [digits + r11]      ; Get the corresponding hex digit
 
 store_digit_16_high:
-    mov [rdi + rsi], dl  ;Almacena el caracter en el string
-    inc rsi             ;Se mueve a la siguiente posición del string
-    inc r8 ;Se incrementa el contador
-    cmp r8, 1024 ;Se pregunta si ya se hicieron la cantidad de agrupaciones máxima
-	je final_base_16
-		
-	jmp loop_base16_high	
+    mov [rdi + rsi], dl         ; Store the hex digit in the result string
+    inc rsi                     ; Move to the next position in the string
+    inc r8                      ; Increment the loop counter
+    cmp r8, 1024                ; Check if we've processed 1024 hex digits
+    je final_base_16            ; If so, we're done
+    
+    test r13, r13               ; Check if any bits are left to process
+    jnz loop_base16_high        ; If there are, continue the loop
 
 final_base_16:
-	mov rdx, rdi
+    mov byte [rdi + rsi], 0     ; Null-terminate the result string
+    mov rdx, rdi
     lea rcx, [rdi + rsi - 1]
-    call reversetest2 ;Darle vuelta al string
+    call reversetest2           ; Reverse the string
     
     mov rax, hex_result
-	call _genericprint ;Imprimir el string
-	ret
+    call _genericprint          ; Print the string
+    ret
 ;--------------------END ATOI-------------------------------------------
 
 _AtoiStart:
-	xor rbx, rbx			;reinicia el registro
-	xor rax, rax			;reinicia el registro
-	lea rcx, [binary_str]			;ingresa el numString a rcx
-	jmp _Atoi
+    ; Convert binary string to number
+    mov rsi, binary_str          ; Load address of binary string
+    xor rax, rax                  ; Clear rax to use it as the result
+    xor rcx, rcx                  ; Clear rcx to use it as a counter
 
-_Atoi:
-	mov bl, byte[rcx]
-	cmp bl, 0xA		
-	je _exitFunction		;se asegura de que sea el final del string
+bin_to_number_loop:
+    mov dl, [rsi + rcx]           ; Load current character
+    cmp dl, 0                     ; Check for null terminator
+    je bin_to_number_done         ; If null terminator, we're done
+    shl rax, 1                    ; Shift result left by 1 (multiply by 2)
+    cmp dl, '1'                   ; Check if character is '1'
+    jne skip_add_one              ; If not '1', skip addition
+    add rax, 1                    ; Add 1 to the result (since current bit is 1)
 
-	sub rbx,30h			;resta 30h al string para volverlo el numero
-	imul rax, 2 			;multiplica el numero almacenado en rax x 10 para volverlo decimal
-	add rax, rbx			;agrega el ultimo numero obtenido a rax (ej: 10+3=13)
-	jc _finishCode		;check de overflow
+skip_add_one:
+    inc rcx                       ; Move to the next character
+    jmp bin_to_number_loop        ; Repeat the loop
 
-
-	xor rbx,rbx			;reinicia el registro
-	inc rcx				;incrementa x 1 el rcx (obtiene el siguiente caracter
-	jmp _Atoi			;realiza loop
+bin_to_number_done:
+    ret
+    mov [bin_num], rax            ; Store the result in bin_num
 
 _exitFunction: 
 	ret
