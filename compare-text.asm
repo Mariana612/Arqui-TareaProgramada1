@@ -1,81 +1,121 @@
 section .data
+    text_start db 'hola me llamo sandia carrasco y me gusta las sandia amarrilla no la roja es que la roja es fea, ademas la gente solo piensa en la sandia roja esto es una palabra por favor me gusta holi.', 0
+	;-- Edit file
+	text_escojaLineaEF  db 'Por favor seleccione la linea que desea modificar',0
+	flag_printOnePhrase db 0
+	lentext dq 0 
+	lenUserText dq 0
+	lenStartingText dq 0
+	
+    ; DECORACIONES
+    deco1 db '  =================================================$', 0xa, 0
+    deco2 db '||         Editor y Comparador de Archivos         ||$', 0xa, 0
+    deco3 db '||                                                 ||$', 0xa, 0
+    deco4 db '||                                                 ||$', 0xa, 0
+    deco5 db '||            Carmen, Mariana & Valeria            ||$', 0xa, 0
+    deco6 db '  =================================================$', 0xa, 0
+    decoVer 	 db '||                   Ver Archivo                   ||$', 0xa, 0
+    decoEditar 	 db '||                 Editar  Archivo                 ||$', 0xa, 0
+    decoComparar db '||               Comparar 2 Archivos               ||$', 0xa, 0
+    ; INSTRUCCIONES
+    instruction_initial1 db '----- Presionar: v = Ver archivo, e = Editar archivo -----', 0xa, 0
+    instruction_initial2 db '   -----    c = Comparar 2 archivos, s = Salir -----   ', 0xa, 0
+    instruction_scroll1 db '----- Presionar: u = Ir a línea anterior, d = Siguiente línea -----', 0xa, 0
+    instruction_scroll2 db '-- h = Ver texto en hexadecimal, q = Regresar al menú principal --', 0xa, 0
+    instruction_edit db '----- Presionar: u = Ir a línea anterior, d = Siguiente línea -----', 0xa, 0
+    instruction_compare db '----- Presionar: q = Regresar al menú principal -----', 0xa, 0
+    option db '--Ingresar opción: ', 0
+    option_no_valida db '--Opción Incorrecta Ingresada, por favor ingresar la correcta: ', 0
     filename1 db 'input1.txt', 0
     filename2 db 'input2.txt', 0
     line_num dq 1
+    ; MENSAJES DE AYUDA
     error_message db 'Failed to open file.', 0xa, 0
     line_message_up db '----No hay una línea anterior----', 0xa, 0
     line_message_down db '----Fin del documento----', 0xa, 0
     same_text db '----El texto no tiene diferencias----', 0xa, 0
+    line_diff_message db 'Diferencia encontrada en la linea: ', 0
+    ; VARIABLES
     printCont dq 0
     espacio db 10
-     ; Define scan codes for arrow keys
-    clear_screen db 33o, "[2J"  	 ; ANSI escape sequence to clear the screen
+    new_line db 0xa, 0
+    clear_screen db 0x1B, '[2J', 0x1B, '[H' ; Combine clear screen and cursor to top-left
+    ; FLAGS
     null_flag db 0
     diff_flag db 0
-    line_diff_message db 'Diferencia encontrada en la linea: ', 0
-	new_line db 0xa, 0
 	
-section .bss 
+section .bss
+	user_input resb 2050
+    lastPrint resq 1          ; Pointer to start of last printed word
+    lenPrint resq 1
+    lenFirstPart resq 1
+    sumPrint resq 1
+    new_text resb 2050 ; Buffer para el texto final.
+    buffer resb 2050
+	
+    ; BUFFERS PARA GUARDAR VARIABLES
     buffer1 resb 2050
     buffer2 resb 2050
     bufferItoa resb 2050
     bufferNum resb 2050
+    ; CONTADORES
     wordCount resq 1                 ; Counter for words
     lineCount resq 1                 ; Counter for lines
     lineCount2 resq 1                 ; Counter for lines
-    user_input resb 2           	 ; Buffer to store user input
+    ; INPUTS
+    user_input_edit resb 2           	 ; Buffer to store user input
+    user_input_comp resb 2           	 ; Buffer to store user input
+    user_input_scroll resb 2           	 ; Buffer to store user input
+    user_input_initial resb 2           	 ; Buffer to store user input
+    ; ARRAYS
     lineLengths resq 10    ; Array to store lengths of each line
     lineLengths2 resq 10
+    ; EXTRAS
     file_descriptors resq 2 
     
 section .text
     global _start
 
 _start:
-    call _openFiles	
-
-    cmp rax, -2
-    je error_occurred   	
-        	
-    call _readFiles     
-	
-	;Guardar los datos de los buffers
-	mov r9, buffer1
-    mov r12, lineLengths
-    call store_text
-    mov qword [lineCount], r10
-	
-	mov r9, buffer2
-    mov r12, lineLengths2
-	call store_text
-	mov qword [lineCount2], r10
-	
-	;Llama al compare
-	call compare
-	
-	;Preparacion para el get_input
-	mov r9, buffer1
-	call _genericprint
-	
-	;Llama al bucle de navegacion de lineas
-	call get_input
-
-   ; Cerrar
-    mov rax, 3
-    mov rdi, [file_descriptors]
+	call clrScrn		   ; Limpiar pantalla
+	;----------------------Imprimir decoraciones
+    mov rax, deco1
+    call _genericprint
+    mov rax, deco2
+    call _genericprint
+    mov rax, deco3
+    call _genericprint
+    mov rax, deco4
+    call _genericprint
+    mov rax, deco5
+    call _genericprint
+    mov rax, deco6
+    call _genericprint
+    mov rax, instruction_initial1
+    call _genericprint
+    mov rax, instruction_initial2
+    call _genericprint
+    
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
     syscall
-    mov rdi, [file_descriptors+8]
-    syscall        
+    
+    ; Imprimir texto
+    mov rax, option
+	call _genericprint
 
-    ; Salir del programa
-    jmp _finishCode
+    call get_input_initial		; Input del usuario
+;--------------------------------------------------------
 
-error_occurred:           
+error_occurred:				; Error de file           
 	mov rax, error_message
 	call _genericprint
 	jmp _finishCode
 
-_openFiles:
+_openFiles:					; Abrir archivo
     ; Abre el primer archivo
     mov rax, 2
     mov rdi, filename1
@@ -101,7 +141,7 @@ _openFiles:
     mov rax, -2
     ret
 
-_readFiles:
+_readFiles:					; Leer archivos
     ; Lee el primer archivo
     mov rax, 0
     mov rdi, [file_descriptors]
@@ -117,7 +157,7 @@ _readFiles:
     syscall
     ret
 
-;--------------------BEGIN COMPARE
+;---------------------------------------------- COMPARE TEXTOS
 
 compare:
 	xor rax, rax
@@ -128,22 +168,23 @@ compare:
 	xor rsi, rsi
 	xor r14, r14
 	mov byte [diff_flag], 0 ; Bandera de diferencia
-	mov rax, 0 ;Contador de indice del buffer1
-	mov rsi, 0 ;Contador de indice del buffer2
-	mov rdx, 0 ;Num de chars en LineLengths
-	mov rcx, 0 ;Num de chars en LineLengths2
-	mov r8, 0  ;Contador de los chars
+	mov rax, 0 ; Contador de indice del buffer1
+	mov rsi, 0 ; Contador de indice del buffer2
+	mov rdx, 0 ; Num de chars en LineLengths
+	mov rcx, 0 ; Num de chars en LineLengths2
+	mov r8, 0  ; Contador de los chars
 	
 	mov rbx, qword[lineCount]
-	cmp rbx, qword[lineCount2]
+	cmp rbx, qword[lineCount2] ; Comparar cuál de los textos tiene más líneas 
 	jge establish_lineCount
+	
 	mov r15, qword[lineCount2]
-	mov rbx, 0 ;Contador de posiciones en los LineLengths/2
+	mov rbx, 0 ; Contador de posiciones en los LineLengths y LineLengths2
 	jmp compare_loop_lines
 
 establish_lineCount:
 	mov r15, qword[lineCount]
-	mov rbx, 0 ;Contador de posiciones en los LineLengths/2
+	mov rbx, 0 ; Contador de posiciones en los LineLengths y LineLengths2
 
 compare_loop_lines:
 	cmp rbx, r15
@@ -178,6 +219,7 @@ compare_loop_chars:
 
 diferencia_lineas:
 	mov byte [diff_flag], 1
+	mov r13, rdx
 	; Guarda los registros en pila
 	push rax
 	push rbx
@@ -187,9 +229,22 @@ diferencia_lineas:
 	push rsi
 	push r14
 	mov rax, line_diff_message
-	call _genericprint2
-	mov rcx, rbx                      ; Carga el contador de lineas
+	call _genericprint
+	
+	mov byte [flag_printOnePhrase], 1
+	mov rsi, rbx                      ; Carga el contador de lineas
 	call _startItoa
+	mov rax, buffer
+	call _genericprint
+	
+	;mov r9, buffer1
+	;mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
+    ;mov qword [wordCount], 0        ; Inicializar contador de palabras
+    ;mov r8, r9                      ; Guardar el valor del texto en r8
+    ;add r8, r13
+    ;add r9, r13
+	;call _printLoop
+	;mov r9, buffer2
 	pop r14
 	pop rsi
 	pop r8
@@ -200,7 +255,7 @@ diferencia_lineas:
 	
 	inc rbx                        ; Incrementa el contador de lineas
 	inc r8                         ; Incrementa el contador de caracteres
-	sub r8, rdx                    ; Ajusta r8 restando el tamao de la linea actual
+	sub r8, rdx                    ; Ajusta r8 restando el tamaño de la linea actual
 	neg r8						   ; Cambia signo de r8 a positivo
 	add rax, r8                    ; Ajusta indice de buffer1
 	add rsi, r8                    ; Ajusta indice de buffer2
@@ -217,9 +272,14 @@ diferencia_lineas_count:
 	push rsi
 	push r14
 	mov rax, line_diff_message
-	call _genericprint2
-	mov rcx, rbx
+	call _genericprint
+	
+	mov byte [flag_printOnePhrase], 1
+	mov rsi, rbx
 	call _startItoa
+	mov rax, buffer
+	call _genericprint
+	
 	pop r14
 	pop rsi
 	pop r8
@@ -238,12 +298,15 @@ textos_iguales:
 	je diferencias_encontradas       
 	
 	mov rax, same_text
-	call _genericprint2
+	call _genericprint
 	
 diferencias_encontradas:
 	ret
-	 	 
-;----------------------------------------------------------------------
+
+;---------------------------------------------- FIN COMPARE TEXTOS
+
+;---------------------------------------------- GUARDAR TEXTOS
+
 store_text:
     mov r10, 0
     mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
@@ -316,45 +379,311 @@ end_loop_store:
 	ret
 
 
-; -------------------END COMPARE
+;---------------------------------------------- FIN GUARDAR TEXTOS
 
+
+;------------------------------------------------------------------------------------ P R I N T S
+
+
+;------------------------- GENERIC PRINT -------------------------------
 _genericprint:
+    mov qword [printCont], 0        ;coloca rdx en 0 (contador)
+    push rax        ;almacenamos lo que esta en rax
+
+_printLoop:
+    mov cl, [rax]
+    cmp cl, 0
+    je _endPrint
+    inc qword [printCont]                ;aumenta contador
+    inc rax
+    jmp _printLoop
+
+_endPrint:
+    mov rax, 1
+    mov rdi, 1
+    mov rdx,[printCont]
+    pop rsi            ;texto
+    syscall
+    ret
+    
+_enterPrint:
+    mov rax, 1
+    mov rdi, 1
+    lea rsi, [espacio]        ; Load the address of the newline character
+    mov rdx, 1                ; Length is 1
+    syscall
+    ret
+
+;-------------- PRINT DE TODO EL DOCUMENTO CON SUS LINEAS --------------
+_startFullPrint:
+    mov [lastPrint], r9       ; Initialize lastPrint to start of text  
+
+_fullPrint:
+    xor rax, rax              ; Clear rax
+    mov qword [lineCount], 0    	; Inicializar contador de líneas
+    mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
+    mov qword [wordCount], 0
+    mov qword[lenFirstPart], -1
+
+_printLoopFP:
+    mov cl, [r9]
+    test cl, cl
+    jz _endPrintFP              ; End if NULL character is reached
+    inc qword[lenFirstPart]
+
+    cmp cl, ' '
+    je _checkWordBoundaryFP
+    cmp cl, 9                 ; ASCII for Tab
+    je _checkWordBoundaryFP
+    cmp cl, 10                ; ASCII for Newline
+    je _checkWordBoundaryFP
+
+    inc qword[printCont]           ; Increment character counter
+    inc r9                    ; Move to next character
+    jmp _printLoopFP
+
+_checkWordBoundaryFP:
+    inc qword[wordCount]           ; Increment word count
+    cmp qword[wordCount], 10
+    jl _incrementCharFP         ; If less than 10 words, keep printing
+    
+    mov rsi, [lineCount]
+    call _startItoa
+    
+    cmp byte[flag_printOnePhrase], 0
+    je _firstcontinueBoundary
+
+
+    mov rax, [buffer] ; Load '1' from userInput into AL
+    mov rbx, [user_input]    ; Load '1' from buffer into BL
+
+    cmp rax, rbx
+    jne _skipLinePLTE
+    
+    _firstcontinueBoundary:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, buffer
+    mov rdx, 5              ; Number of characters from lastPrint to current position
+    syscall
+
+
+	mov rax, 1                  ; syscall: write
+	mov rdi, 1                  ; fd: stdout
+	mov rsi, [lastPrint]        ; Start of string to print
+	mov rdx, r9
+	sub rdx, [lastPrint]        ; Calculate length to print
+	test rdx, rdx               ; Check if length is positive
+	jle _endPrintFP              ; Skip printing if length is not positive
+	syscall                     ; Perform print
+	
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio          ; Print newline
+    mov rdx, 1
+    syscall
+    
+    cmp byte[flag_printOnePhrase], 1
+    je _finishSpecialFP
+    
+    jmp _continueBoundary
+    
+    _skipLinePLTE:				; CHEQUEO por si no se necesita el print
+
+	mov rdx, r9
+	sub rdx, [lastPrint]        ; Calculate length to print
+	test rdx, rdx               ; Check if length is positive
+	jle _endPrintFP              ; Skip printing if length is not positive
+	syscall 
+
+	_continueBoundary:
+    mov [lastPrint], r9       ; Update lastPrint to new position
+    xor rax, rax
+    mov [wordCount], rax      ; Reset word count
+    inc qword[lineCount]           ; Increment line count
+
+_incrementCharFP:
+    inc qword[printCont]           ; Increment character counter
+    inc r9                    ; Move to next character
+    jmp _printLoopFP
+
+_endPrintFP:
+    mov rsi, [lineCount]
+    call _startItoa
+    
+    cmp byte[flag_printOnePhrase], 0
+    je _firstcontinueEP
+
+    mov rax, [buffer] ; Load '1' from userInput into AL
+    mov rbx, [user_input]    ; Load '1' from buffer into BL
+
+    cmp rax, rbx
+    jne _finishSpecialFP
+    
+    _firstcontinueEP:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, buffer
+    mov rdx, 2               ; Number of characters from lastPrint to current position
+    syscall
+    
+    mov rsi, [lastPrint]      ; Get the pointer to the last printed position
+    mov rdx, r9               ; Get the current position in text
+    sub rdx, rsi              ; Calculate the length of the remaining text
+    test rdx, rdx             ; Check if there is anything to print
+    jle _finalizeFP             ; Jump to finalize if nothing to print
+
+    ; Print remaining content
+    mov rax, 1                ; syscall number for sys_write
+    mov rdi, 1                ; file descriptor 1 for stdout
+    syscall                   ; Execute the print
+
+_finalizeFP:
+    call _enterPrint
+    call _enterPrint
+    ret
+   
+_finishSpecialFP:
+	mov rsi, [lastPrint]      ; Get the pointer to the last printed position
+    mov rdx, r9               ; Get the current position in text
+    sub rdx, rsi
+    mov qword[lenPrint], rdx
+    
+
+	ret
+
+;--------------------- MANEJO DE EDICION DE CODIGO ---------------------
+
+_manageEdit:
+	mov byte[flag_printOnePhrase],0
+	mov r9, text_start 
+	call _startFullPrint
+    mov rax, text_escojaLineaEF
+    call _genericprint   
+    call _enterPrint
+    
+    call get_input
+    mov byte[flag_printOnePhrase],1
+    mov r9, text_start 
+    call _startFullPrint
+    call get_inputSPECIAL
+    
+    call _getInputInfo
+    mov byte[flag_printOnePhrase],0
+    call _editText
+    
+    ret
+
+_getInputInfo:
+	mov rdi, user_input 
+	call _calculate_size
+	
+	mov rax, qword[lentext]
+	mov qword[lenUserText], rax
+	
+	;---- texto original
+	mov rdi, text_start 
+	call _calculate_size
+	
+	mov rax, qword[lentext]
+	mov qword[lenStartingText], rax
+
+	ret
+	
+get_inputSPECIAL:
+    mov rax, 0         ; syscall number for read
+    mov rdi, 0         ; file descriptor 0 (stdin)
+    mov rsi, user_input; buffer to store the input
+    add rsi, 1         ; Adjust buffer pointer to leave space for the space character
+    mov rdx, 2049      ; reduce max bytes by one to account for the space at the start
+    syscall            ; perform the syscall
+
+    ; Assuming rax contains the number of bytes read, adjust for newline character
+    test rax, rax      ; Check if any bytes were read
+    jz input_done      ; Jump if zero bytes were read (skip if input is empty)
+
+    dec rax            ; Decrement rax to exclude the newline character from the count
+    mov byte [rsi + rax], 0 ; Replace newline with null terminator
+
+    ; Insert space at the beginning of the buffer
+    dec rsi            ; Move back to the start of the buffer
+    mov byte [rsi], ' '; Insert space character
+
+input_done:
+    ret                ; Return from the function
+ 
+    
+_editText:
+    ; Copia la primera parte al buffer nuevo
+    mov r8, [lenFirstPart] 
+    sub r8, [lenPrint]
+    
+    mov rsi, text_start
+    mov rdi, new_text
+    mov rcx, r8 ; Termina la primera línea más un espacio
+    rep movsb
+
+    ; Añade text_test
+    mov rsi, user_input
+    mov rcx, [lenUserText]  ; Longitud de 'xd ' sin contar el null terminator
+    rep movsb
+    
+
+	mov r9, [lenStartingText]
+	sub r9, [lenFirstPart]
+	
+	mov rsi, text_start
+    add rsi, [lenFirstPart]  ; Salta la primera y segunda línea
+    mov rcx, r9 ; Longitud total menos lo ya copiado
+    rep movsb
+
+	mov r9, new_text 
+	call _startFullPrint
+	
+    ;mov rax, new_text
+    ;call _genericprint
+
+	ret
+
+;---------------------------------------------- PRINT TEXTO LÍNEA POR LÍNEA
+
+_print_ver:
     mov qword [lineCount], 0    	; Inicializar contador de líneas
     mov qword [lineCount2], 0    	; Inicializar contador de líneas
     mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
     mov qword [wordCount], 0        ; Inicializar contador de palabras
-    mov r8, r9                      ; Guardar el valor del texto en e8
+    mov r8, r9                      ; Guardar el valor del texto en r8
 
-_printLoop:
+_printLoop_ver:
     mov cl, [r9]
     cmp cl, 0
     je null_flag_line				; Terminar impresión si se encuentra un null
 
     ; Revisar si el actual caracter es un espacio, tab o enter 
     cmp cl, ' '
-    je _checkWordBoundary
+    je _checkWordBoundary_ver
     cmp cl, 9
-    je _checkWordBoundary
+    je _checkWordBoundary_ver
     cmp cl, 10
-    je _checkWordBoundary
+    je _checkWordBoundary_ver
 
     inc qword [printCont]           ; Incrementar contador de caracter
     inc r9                          ; Moverse al siguiente caracter
-    jmp _printLoop					; Seguir en el loop
+    jmp _printLoop_ver					; Seguir en el loop
 
-_checkWordBoundary:
+_checkWordBoundary_ver:
     inc qword [printCont]           ; Incrementar contador de caracter
     inc qword [wordCount]           ; Incrementar contador de palabras
 
     cmp qword [wordCount], 10       ; Revisar si ya se tienen las 10 palabras
-    jne _continuePrinting
+    jne _continuePrinting_ver
     
-    jmp _endPrint
+    jmp _endPrint_ver
 
 null_flag_line:
 	mov byte [null_flag], 1			; Colocar flag de última línea
 
-_endPrint:
+_endPrint_ver:
     mov rax, 1
     mov rdi, 1
     mov rdx, [printCont]			; Variable de cantidad de caracteres
@@ -369,30 +698,263 @@ _endPrint:
     syscall
     ret
 
-_continuePrinting:
+_continuePrinting_ver:
     inc r9                          ; Moverse al siguiente caracter
-    jmp _printLoop					; Seguir con el loop
+    jmp _printLoop_ver					; Seguir con el loop
 
-; Leer input del usuario
-get_input:
+;---------------------------------------------- FIN IMPRIMIR TEXTO LÍNEA POR LÍNEA
+
+; Clean Screen
+clrScrn:
+    mov rax, 1 
+    mov rdi, 1
+    mov rsi, clear_screen  ; Secuencia de clear screen
+    mov rdx, 7
+    syscall
+    ret
+    
+;------------------------------------------------------------------------------------ I N P U T S
+
+;---------------------------------------------- LEER INPUT DE MENÚ INICIAL
+get_input_initial:
     mov rax, 0
     mov rdi, 0
-    mov rsi, user_input
+    mov rsi, user_input_initial
+    mov rdx, 2
+    syscall
+	
+	; Comparar el input a las letras
+    cmp byte[user_input_initial], 'v'		; Ver archivo, se mueve una línea de texto hacia arriba
+    je ver_archivo
+    cmp byte[user_input_initial], 'e'		; Editar archivo, se mueve una línea de texto hacia arriba
+    je editar_archivo
+    cmp byte[user_input_initial], 'c'		; Comparar archivos, se sale del programa
+    je comparar_archivos
+    cmp byte[user_input_initial], 's'		; Salir, se sale del programa
+    je _finishCode
+    
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+    
+    mov rax, option_no_valida
+    call _genericprint
+
+    jmp get_input_initial            		; Se repite el loop para seguir leyendo los inputs
+
+;------------------------------ VER ARCHIVO
+ver_archivo:
+	call clrScrn
+	
+	mov rax, deco1
+    call _genericprint
+    mov rax, decoVer
+    call _genericprint
+    mov rax, deco6
+    call _genericprint
+    
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+    
+    mov rax, instruction_scroll1
+    call _genericprint
+    mov rax, instruction_scroll2
+    call _genericprint
+    
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+    
+    call _openFiles	
+
+    cmp rax, -2
+    je error_occurred   	
+        	
+    call _readFiles
+    
+    mov r9, buffer1
+	call _print_ver
+	
+	call get_input_ver
+
+;------------------------------ EDITAR ARCHIVO
+editar_archivo:
+	call clrScrn
+	
+	mov rax, deco1
+    call _genericprint
+    mov rax, decoEditar
+    call _genericprint
+    mov rax, deco6
+    call _genericprint
+    
+    mov rax, instruction_compare
+    call _genericprint
+    
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+    
+    call _manageEdit
+    
+    call get_input_edit
+
+;------------------------------ COMPARAR ARCHIVOS
+comparar_archivos:
+	call clrScrn
+	
+	mov rax, deco1
+    call _genericprint
+    mov rax, decoComparar
+    call _genericprint
+    mov rax, deco6
+    call _genericprint
+    
+    mov rax, instruction_compare
+    call _genericprint
+    
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+    
+    call _openFiles	
+
+    cmp rax, -2
+    je error_occurred   	
+        	
+    call _readFiles
+    
+    ;Guardar los datos de los buffers
+	mov r9, buffer1
+    mov r12, lineLengths
+    call store_text
+    mov qword [lineCount], r10
+	
+	mov r9, buffer2
+    mov r12, lineLengths2
+	call store_text
+	mov qword [lineCount2], r10
+	
+	;Llama al compare
+	call compare
+	
+	; Cerrar
+    mov rax, 3
+    mov rdi, [file_descriptors]
+    syscall
+    mov rdi, [file_descriptors+8]
+    syscall
+    
+    call get_input_comp
+    
+;---------------------------------------------- LEER INPUT DE MENÚ EDITAR ARCHIVO
+get_input_edit:
+	mov rax, 0
+    mov rdi, 0
+    mov rsi, user_input_edit
+    mov rdx, 2
+    syscall
+    
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+
+	; Comparar el input a las letras
+    cmp byte[user_input_edit], 'q'		; Quit, se sale del programa
+    je _start
+	
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+    
+    mov rax, option_no_valida
+    call _genericprint
+    
+    jmp get_input_edit            		; Se repite el loop para seguir leyendo los inputs
+
+;---------------------------------------------- LEER INPUT DE MENÚ COMPARAR ARCHIVOS
+get_input_comp:
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, user_input_comp
+    mov rdx, 2
+    syscall
+    
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+
+	; Comparar el input a las letras
+    cmp byte[user_input_comp], 'q'		; Quit, se sale del programa
+    je _start
+	
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+    
+    mov rax, option_no_valida
+    call _genericprint
+    
+    jmp get_input_comp            		; Se repite el loop para seguir leyendo los inputs
+    
+;---------------------------------------------- LEER INPUT DE MENÚ VER ARCHIVO
+get_input_ver:
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, user_input_scroll
     mov rdx, 2
     syscall
 
 	; Comparar el input a las letras
-    cmp byte[user_input], 'u'		; Up, se mueve una línea de texto hacia arriba
-    je .move_up
-    cmp byte[user_input], 'd'		; Down, se mueve una línea de texto hacia arriba
-    je .move_down
-    cmp byte[user_input], 'q'		; Quit, se sale del programa
-    je _finishCode
-
-    jmp get_input            		; Se repite el loop para seguir leyendo los inputs
+    cmp byte[user_input_scroll], 'u'		; Up, se mueve una línea de texto hacia arriba
+    je move_up
+    cmp byte[user_input_scroll], 'd'		; Down, se mueve una línea de texto hacia arriba
+    je move_down
+    cmp byte[user_input_scroll], 'q'		; Quit, se sale del programa
+    je _start
+	
+    ; Imprimir un enter
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, espacio
+    mov rdx, 1
+    syscall
+    
+    mov rax, option_no_valida
+    call _genericprint
+    
+    jmp get_input_ver            		; Se repite el loop para seguir leyendo los inputs
 
 ; Si se presiona la 'u'
-.move_up:
+move_up:
 	mov byte [null_flag], 0
 	
 	cmp qword [lineCount], 0
@@ -416,12 +978,12 @@ get_input:
     mov qword [wordCount], 0        ; Se resetea el contador de palabras
     mov qword [printCont], 0        ; Se resetea el contador de caracteres
     
-    call _printLoop					; Se imprime la línea actual
-    
-    jmp get_input					; Se vuelve a pedir el input
+    call _printLoop_ver					; Se imprime la línea actual
+	
+    jmp get_input_ver					; Se vuelve a pedir el input
 
 ; Si se presiona la 'd'
-.move_down:
+move_down:
     cmp byte[null_flag], 1			; Si el null flaf está prendida, es la última línea del texto
     je last_line
     
@@ -442,9 +1004,9 @@ get_input:
     mov qword [wordCount], 0        ; Se resetea el contador de palabras
     mov qword [printCont], 0        ; Se resetea el contador de caracteres
     
-    call _printLoop
+    call _printLoop_ver
 
-    jmp get_input
+    jmp get_input_ver
 
 ; Cuando se está al incio del texto
 no_prev_line:
@@ -455,7 +1017,7 @@ no_prev_line:
     mov rdx, 36
     syscall
     
-    jmp get_input
+    jmp get_input_ver
 
 ; Cuando se está al final del texto
 last_line:
@@ -466,37 +1028,54 @@ last_line:
     mov rdx, 27
     syscall
     
-    jmp get_input
+    jmp get_input_ver
+
+;---------------------------------------------- LEER INPUT DE MANEJAR EDICIÓN
+get_input:
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, user_input
+    mov rdx, 2050
+    syscall
+    ret
 
 
-;----------------------ITOA
-_startItoa:
-	mov rdi, bufferItoa
-    mov rsi, rcx 	  ; Numero a convertir en rcx
+;-------------------------------- ITOA ---------------------------------
+_startItoa: 
+    mov rdi, buffer
+    mov rsi, rsi 
     mov rbx, 10       ; La base
     call itoa
-    mov r8, rax
+    mov r8, rax                     ; Almacena la longitud de la cadena
     
-    mov byte [bufferItoa + r8], 10
+    ;Añade un salto de línea
+    cmp byte[flag_printOnePhrase], 0
+    jne _continueitoaNS
+    mov byte [buffer + r8], ' '
+    inc r8
+    jmp _enditoa
+    
+    
+    _continueitoaNS:
+    mov byte [buffer + r8], 10
     inc r8
     
-    mov byte [bufferItoa + r8], 0
-
-    mov rax, bufferItoa
+    _enditoa:
     
-    mov rax, bufferItoa
-    call _genericprint2
+    ; Termina la cadena con null
+    mov byte [buffer + r8], 0
     
     ret
 
+; Definición de la función ITOA
 itoa:
-    mov rax, rsi
-    mov rsi, 0
-    mov r10, 10
+    mov rax, rsi                    ; Mueve el número a convertir (en rsi) a rax
+    mov rsi, 0                      ; Inicializa rsi como 0 (contador de posición en la cadena)
+    mov r10, 10                    
 
 .loop:
-    mov rdx, 0
-    div r10
+    mov rdx, 0                    
+    div r10                         
 	add rdx, "0"
 	mov [rdi +rsi], dl
 	inc rsi
@@ -519,30 +1098,25 @@ itoa:
     cmp rdx, rcx
     jl .reverseloop
 
-    mov rax, rsi
+    mov rax, rsi                    ; Devuelve la longitud de la cadena
     ret
 ;-------------Fin Itoa---------------------------
 
+_calculate_size:
+    push rdi    ; Guarda el valor original de RDI
+    xor rcx, rcx    ; RCX será nuestro contador de caracteres
 
-_genericprint2:
-    mov qword [printCont], 0        ;coloca rdx en 0 (contador)
-    push rax        ;almacenamos lo que esta en rax
+count_loopCS:
+    cmp byte [rdi], 0    	; Compara el carácter actual con 0 (carácter nulo)
+    je end_loop    			; Si es cero, termina el bucle
+    inc rdi    				; Incrementa el puntero al siguiente carácter
+    inc rcx    				; Incrementa el contador de caracteres
+    jmp count_loopCS   		; Repite el bucle
 
-_printLoop2:
-    mov cl, [rax]
-    cmp cl, 0
-    je _endPrint2
-    inc qword [printCont]                ;aumenta contador
-    inc rax
-    jmp _printLoop2
-
-_endPrint2:
-    mov rax, 1
-    mov rdi, 1
-    mov rdx,[printCont]
-    pop rsi            ;texto
-    syscall
-    ret
+end_loop:
+    mov [lentext], rcx    	; Escribe el contador en la variable 'len'
+    pop rdi    				; Restaura el valor original de RDI
+    ret    					; Retorna de la función
 
 ; Se termina el programa
 _finishCode:
