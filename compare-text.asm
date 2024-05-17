@@ -123,48 +123,6 @@ _start:
     call get_input_initial		; Input del usuario
 ;--------------------------------------------------------
 
-_openFiles:					; Abrir archivo
-    ; Abre el primer archivo
-    mov rax, 2
-    mov rdi, filename1
-    xor rsi, rsi
-    xor rdx, rdx
-    syscall
-    test rax, rax
-    js .error
-    mov [file_descriptors], rax
-
-    ; Abre el segundo archivo
-    mov rax, 2
-    mov rdi, filename2
-    xor rsi, rsi
-    xor rdx, rdx
-    syscall
-    test rax, rax
-    js .error
-    mov [file_descriptors+8], rax
-    ret
-
-.error:
-    mov rax, -2
-    ret
-
-_readFiles:					; Leer archivos
-    ; Lee el primer archivo
-    mov rax, 0
-    mov rdi, [file_descriptors]
-    mov rsi, buffer1
-    mov rdx, 2050
-    syscall
-
-    ; Lee el segundo archivo
-    mov rax, 0
-    mov rdi, [file_descriptors+8]
-    mov rsi, buffer2
-    mov rdx, 2050
-    syscall
-    ret
-
 ;---------------------------------------------- COMPARE TEXTOS
 
 compare:
@@ -181,6 +139,8 @@ compare:
 	mov rdx, 0 ; Num de chars en LineLengths
 	mov rcx, 0 ; Num de chars en LineLengths2
 	mov r8, 0  ; Contador de los chars
+	mov r12, 0
+	mov rdi, 0
 	
 	mov rbx, qword[lineCount]
 	cmp rbx, qword[lineCount2] ; Comparar cuál de los textos tiene más líneas 
@@ -200,6 +160,9 @@ compare_loop_lines:
 	
 	mov rdx, [lineLengths + rbx * 8]  ; Obtiene el lenght del array lineLengths
 	mov rcx, [lineLengths2 + rbx * 8] ; Obtiene el lenght del array lineLengths2
+	
+	add r12, rdx
+	add rdi, rcx
 	
 	cmp rdx, rcx                      ; Compara los lengths de ambas lineas
 	jne diferencia_lineas_count       ; Si son diferentes va a diferencia_lineas_count que es para cuando las lineas tienen distintos tamanos
@@ -227,7 +190,8 @@ compare_loop_chars:
 
 diferencia_lineas:
 	mov byte [diff_flag], 1
-	mov r13, rdx
+	mov r14, r12
+	mov r13, rdi
 	; Guarda los registros en pila
 	push rax
 	push rbx
@@ -236,6 +200,10 @@ diferencia_lineas:
 	push r8
 	push rsi
 	push r14
+	push r9
+	push rdi
+	push r13
+	call _enterPrint
 	mov rax, line_diff_message
 	call _genericprint
 	
@@ -244,15 +212,64 @@ diferencia_lineas:
 	call _startItoa
 	mov rax, buffer
 	call _genericprint
+	call _enterPrint
+	pop r13
+	pop rdi
+	pop r9
+	pop r14
+	pop rsi
+	pop r8
+	pop rdx
+	pop rcx
+	pop rbx
+	pop rax
 	
-	;mov r9, buffer1
-	;mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
-    ;mov qword [wordCount], 0        ; Inicializar contador de palabras
-    ;mov r8, r9                      ; Guardar el valor del texto en r8
-    ;add r8, r13
-    ;add r9, r13
-	;call _printLoop
-	;mov r9, buffer2
+	push rax
+	push rbx
+	push rcx
+	push rdx
+	push r8
+	push rsi
+	push r14
+	push r9
+	push rdi
+	mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
+    mov qword [wordCount], 0        ; Inicializar contador de palabras
+	mov r9, buffer1	
+	sub r14, rdx
+	add r9, r14
+	mov r8, r9
+	call _printLoop_ver
+	pop rdi
+	pop r9
+	pop r14
+	pop rsi
+	pop r8
+	pop rdx
+	pop rcx
+	pop rbx
+	pop rax
+	
+	push rax
+	push rbx
+	push rcx
+	push rdx
+	push r8
+	push rsi
+	push r14
+	push r9
+	push rdi
+	push r13
+	mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
+    mov qword [wordCount], 0        ; Inicializar contador de palabras
+	mov r9, buffer2	
+	sub r13, rcx
+	add r9, r13
+	mov r8, r9
+	call _printLoop_ver
+	pop r13
+	pop rdi
+	pop r9
 	pop r14
 	pop rsi
 	pop r8
@@ -271,7 +288,10 @@ diferencia_lineas:
 	jmp compare_loop_lines
 
 diferencia_lineas_count:
-	mov byte [diff_flag], 1	
+	mov byte [diff_flag], 1
+	mov r14, r12
+	mov r13, rdi
+	; Guarda los registros en pila
 	push rax
 	push rbx
 	push rcx
@@ -279,15 +299,76 @@ diferencia_lineas_count:
 	push r8
 	push rsi
 	push r14
+	push r9
+	push rdi
+	push r13
+	call _enterPrint
 	mov rax, line_diff_message
 	call _genericprint
 	
 	mov byte [flag_printOnePhrase], 1
-	mov rsi, rbx
+	mov rsi, rbx                      ; Carga el contador de lineas
 	call _startItoa
 	mov rax, buffer
 	call _genericprint
+	call _enterPrint
+	pop r13
+	pop rdi
+	pop r9
+	pop r14
+	pop rsi
+	pop r8
+	pop rdx
+	pop rcx
+	pop rbx
+	pop rax
 	
+	push rax
+	push rbx
+	push rcx
+	push rdx
+	push r8
+	push rsi
+	push r14
+	push r9
+	push rdi
+	mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
+    mov qword [wordCount], 0        ; Inicializar contador de palabras
+	mov r9, buffer1	
+	sub r14, rdx
+	add r9, r14
+	mov r8, r9
+	call _printLoop_ver
+	pop rdi
+	pop r9
+	pop r14
+	pop rsi
+	pop r8
+	pop rdx
+	pop rcx
+	pop rbx
+	pop rax
+	
+	push rax
+	push rbx
+	push rcx
+	push rdx
+	push r8
+	push rsi
+	push r14
+	push r9
+	push rdi
+	push r13
+	mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
+    mov qword [wordCount], 0        ; Inicializar contador de palabras
+	mov r9, buffer2	
+	sub r13, rcx
+	add r9, r13
+	mov r8, r9
+	call _printLoop_ver
+	pop r13
+	pop rdi
+	pop r9
 	pop r14
 	pop rsi
 	pop r8
@@ -305,6 +386,7 @@ textos_iguales:
 	cmp byte[diff_flag], 1           ; Si la bandera esta encendida salta salta a diferencias_encontradas
 	je diferencias_encontradas       
 	
+	call _enterPrint
 	mov rax, same_text
 	call _genericprint
 	
@@ -701,11 +783,7 @@ _endPrint_ver:
     syscall
     
     ; Imprimir un enter
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, espacio
-    mov rdx, 1
-    syscall
+    call _enterPrint
     ret
 
 _continuePrinting_ver:
@@ -744,11 +822,7 @@ get_input_initial:
     je _finishCode
     
     ; Imprimir un enter
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, espacio
-    mov rdx, 1
-    syscall
+    call _enterPrint
     
     mov rax, option_no_valida
     call _genericprint
@@ -767,11 +841,7 @@ ver_archivo:
     call _genericprint
     
     ; Imprimir un enter
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, espacio
-    mov rdx, 1
-    syscall
+   call _enterPrint
     
     mov rax, instruction_scroll1
     call _genericprint
@@ -779,20 +849,9 @@ ver_archivo:
     call _genericprint
     
     ; Imprimir un enter
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, espacio
-    mov rdx, 1
-    syscall
+    call _enterPrint
     
     call _manageDinamicFile
-    
-    ;call _openFiles	
-
-    ;cmp rax, -2
-    ;je error_occurred   	
-        	
-    ;call _readFiles
     
     mov r9, readFileBuffer
 	call _print_ver
@@ -841,11 +900,7 @@ comparar_archivos:
     call _genericprint
     
     ; Imprimir un enter
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, espacio
-    mov rdx, 1
-    syscall
+    call _enterPrint
     
     call _manageDinamicFile
     lea rsi, [readFileBuffer]   ; Fuente: dirección de inicio de user_input
