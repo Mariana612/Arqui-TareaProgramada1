@@ -1182,13 +1182,14 @@ hex_text:
 	
 	call _enterPrint
 	call _AtoiStart
-    call ascii_to_hex
+    call bin_to_hex
     call _enterPrint
     
     jmp get_input_ver
 
 texto_ascii:
-	mov rax, digits
+	call asciiToHex
+	mov rax, hex_result
 	call _genericprint
     
 	jmp get_input_ver
@@ -1226,7 +1227,7 @@ is_binary:
 ;---------------COMPARE BINARIO-----------------------------------
 
 ;--------------------BIN A HEX-------------------------------------------
-ascii_to_hex:
+bin_to_hex:
     mov rsi, 0                  ; Reset string length counter
     mov r13, [bin_num]          ; Load the binary number
     mov rdi, hex_result         ; Point to the result buffer
@@ -1256,6 +1257,47 @@ final_base_16:
     
     mov rax, hex_result
     call _genericprint          ; Print the string
+    ret
+
+;--------------------ASCII A HEX-------------------------------------------
+asciiToHex:
+    mov rdi, readFileBuffer
+    mov rsi, hex_result
+
+    xor rcx, rcx
+convert_loop:
+    ; Load byte del string
+    movzx rax, byte [rdi + rcx]
+
+    ; Check si esta al final
+    test rax, rax
+    jz end_convert_loop
+
+    ; Convert ASCII a hexa
+    ; High nibble
+    shr rax, 4
+    mov dl, byte [digits + rax]
+    mov [rsi], dl
+    inc rsi
+
+    ; Low nibble
+    movzx rax, byte [rdi + rcx]
+    and rax, 0x0F
+    mov dl, byte [digits + rax]
+    mov [rsi], dl
+    inc rsi
+
+    mov byte [rsi], ' '
+    inc rsi
+    
+    ; Move al siguiente caracter
+    inc rcx
+    jmp convert_loop
+
+end_convert_loop:
+    ; Null-terminate
+    mov byte [rsi], 0
+
     ret
 ;--------------------START ATOI-------------------------------------------
 
