@@ -2,6 +2,7 @@ section .data
     text_start db 'hola me llamo sandia carrasco y me gusta las sandia amarrilla no la roja es que la roja es fea, ademas la gente solo piensa en la sandia roja esto es una palabra por favor me gusta holi.', 0
 	;-- Edit file
 	text_escojaLineaEF  db 'Por favor seleccione la linea que desea modificar: ',0
+	text_documentoEditado  db 'El documento ha sido editado correctamente',10,'Gracias por utilizar el editior de archivos.',10,0
 	flag_printOnePhrase db 0
 	lentext dq 0 
 	lenUserText dq 0
@@ -707,7 +708,10 @@ _manageEdit:
     mov byte[flag_printOnePhrase],0
     call _editText
     
-    ret
+    mov rax, text_documentoEditado
+    call _genericprint
+    jmp _finishCode
+    
 
 _getInputInfo:
 	mov rdi, user_input_line
