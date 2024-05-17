@@ -116,11 +116,7 @@ _start:
     call _genericprint
     
     ; Imprimir un enter
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, espacio
-    mov rdx, 1
-    syscall
+    call _enterPrint
     
     ; Imprimir texto
     mov rax, option
@@ -907,6 +903,9 @@ ver_archivo:
     call _enterPrint
     
     call _manageDinamicFile
+    
+	mov rax, option
+	call _genericprint
 	
 	call get_input_ver
 
@@ -1070,6 +1069,7 @@ get_input_ver:
     jmp get_input_ver           		; Se repite el loop para seguir leyendo los inputs
 
 open_text:
+	call _enterPrint
 	mov rax, instruction_scroll2
     call _genericprint
     
@@ -1078,6 +1078,11 @@ open_text:
 	call _print_ver
 
 open_text_cont:
+	mov rax, 1
+    mov rdi, 1
+    mov rsi, option
+    mov rdx, 21
+    syscall
 	
 	mov rax, 0
     mov rdi, 0
@@ -1128,15 +1133,16 @@ move_down:
     cmp byte[null_flag], 1			; Si el null flaf está prendida, es la última línea del texto
     je last_line
     
-    push rbx
-    push rsi
+    ;push rbx
+    ;push rsi
+    ;push rdi
     mov rbx, qword[lineCount]		; Se guarda el contador de líneas en un registro
     mov rsi, lineLengths			; Se guarda la variable de la lista de tamaños de líneas en un registro
     mov rdi, qword[printCont]		; Se guarda el contador de caracteres de la línea en un registro
     mov qword [rsi + rbx * 8], rdi	; Se guarda la cantidad de caracteres de la línea actual en la variable lineLengths
-    pop rdi
-    pop rsi
-    pop rbx
+    ;pop rdi
+    ;pop rsi
+    ;pop rbx
 
 	add r8, [printCont]				; Avanza a la siguiente línea
 	inc r9							; Se incrementa el puntero para que apunte a la primera letra de la línea
@@ -1151,23 +1157,19 @@ move_down:
 
 ; Cuando se está al incio del texto
 no_prev_line:
-	; Imprimir texto
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, line_message_up
-    mov rdx, 36
-    syscall
+	call _enterPrint
+    mov rax, line_message_up
+    call _genericprint
+    call _enterPrint
     
     jmp open_text_cont
 
 ; Cuando se está al final del texto
 last_line:
-	; Imprimir texto
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, line_message_down
-    mov rdx, 27
-    syscall
+    call _enterPrint
+    mov rax, line_message_down
+    call _genericprint
+    call _enterPrint
     
     jmp open_text_cont
 
@@ -1185,13 +1187,19 @@ hex_text:
     call bin_to_hex
     call _enterPrint
     
+    mov rax, option
+	call _genericprint
     jmp get_input_ver
 
 texto_ascii:
 	call asciiToHex
 	mov rax, hex_result
 	call _genericprint
+	
+	call _enterPrint
     
+	mov rax, option
+	call _genericprint
 	jmp get_input_ver
 
 ;---------------COMPARE BINARIO-----------------------------------
