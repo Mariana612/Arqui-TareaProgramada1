@@ -12,7 +12,7 @@ section .data
 	lentext dq 0 
 	lenUserText dq 0
 	lenStartingText dq 0
-    binary_str db "10101010101111010101", 0
+    binary_str db "10101010101111010101010101111010101010101111010101", 0
     decimal_number dd 0
     
 
@@ -65,7 +65,6 @@ _start:
     ;call _genericprint
     
     call _AtoiStart
-	mov [bin_num], rax
     call ascii_to_hex
    
    ;mov rax, hex_result
@@ -283,10 +282,10 @@ bin_to_number_loop:
     mov dl, [rsi + rcx]           ; Load current character
     cmp dl, 0                     ; Check for null terminator
     je bin_to_number_done         ; If null terminator, we're done
-    shl rax, 1                    ; Shift result left by 1 (multiply by 2)
+    shl qword[bin_num], 1                    ; Shift result left by 1 (multiply by 2)
     cmp dl, '1'                   ; Check if character is '1'
     jne skip_add_one              ; If not '1', skip addition
-    add rax, 1                    ; Add 1 to the result (since current bit is 1)
+    add qword[bin_num], 1                    ; Add 1 to the result (since current bit is 1)
 
 skip_add_one:
     inc rcx                       ; Move to the next character
@@ -294,8 +293,7 @@ skip_add_one:
 
 bin_to_number_done:
     ret
-    mov [bin_num], rax            ; Store the result in bin_num
-
+    
 _exitFunction: 
 	ret
 
