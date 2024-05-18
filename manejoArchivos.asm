@@ -1,6 +1,7 @@
 section .data
 	;-- Edit file
 	text_escojaLineaEF  db 'Por favor seleccione la linea que desea modificar: ',0
+	text_newtext  db 'Por favor ingrese el nuevo texto ',10,0
 	text_documentoEditado  db 'El documento ha sido editado correctamente',10,'Gracias por utilizar el editor de archivos.',10,0
 	flag_printOnePhrase db 0
 	lentext dq 0 
@@ -700,6 +701,10 @@ _manageEdit:
     mov byte[flag_printOnePhrase],1
     mov r9, readFileBuffer 
     call _startFullPrint
+    
+    mov rax, text_newtext
+    call _genericprint
+    
     call get_inputSPECIAL
     
     
