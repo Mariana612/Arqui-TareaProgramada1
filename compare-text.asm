@@ -73,17 +73,17 @@ section .bss
     bin_num resb 4097
     hex_result resb 4097
     ; CONTADORES
-    wordCount resq 1                 ; Counter for words
-    lineCount resq 1                 ; Counter for lines
-    lineCount2 resq 1                 ; Counter for lines
+    wordCount resq 1                 ; Counter para palabras words
+    lineCount resq 1                 ; Counter para lineas
+    lineCount2 resq 1                ; Counter para lineas
     ; INPUTS
-    user_input_edit resb 2           	 ; Buffer to store user input
-    user_input_comp resb 2           	 ; Buffer to store user input
-    user_input_choose resb 2           	 ; Buffer to store user input
-    user_input_scroll resb 2           	 ; Buffer to store user input
-    user_input_initial resb 2           	 ; Buffer to store user input
+    user_input_edit resb 2           	 ; Buffer para guardar user input
+    user_input_comp resb 2           	 ; Buffer para guardar user input
+    user_input_choose resb 2           	 ; Buffer para guardar user input
+    user_input_scroll resb 2           	 ; Buffer para guardar user input
+    user_input_initial resb 2           	 ; Buffer para guardar user input
     ; ARRAYS
-    lineLengths resq 10    ; Array to store lengths of each line
+    lineLengths resq 10    ; Array guardar lenght de cada line
     lineLengths2 resq 10
     ; EXTRAS
     file_descriptors resq 2 
@@ -501,17 +501,17 @@ _endPrint:
 _enterPrint:
     mov rax, 1
     mov rdi, 1
-    lea rsi, [espacio]        ; Load the address of the newline character
-    mov rdx, 1                ; Length is 1
+    lea rsi, [espacio]        ; Load la direccion del caracter de nueva linea
+    mov rdx, 1                ; Length es 1
     syscall
     ret
 
 ;-------------- PRINT DE TODO EL DOCUMENTO CON SUS LINEAS --------------
 _startFullPrint:
-    mov [lastPrint], r9       ; Initialize lastPrint to start of text  
+    mov [lastPrint], r9       ; Inicializa lastPrint al inicio del texto
 
 _fullPrint:
-    xor rax, rax              ; Clear rax
+    xor rax, rax              ; Limpia rax
     mov qword [lineCount], 0    	; Inicializar contador de líneas
     mov qword [printCont], 0        ; Inicializar contador de caracteres por linea
     mov qword [wordCount], 0
@@ -520,24 +520,24 @@ _fullPrint:
 _printLoopFP:
     mov cl, [r9]
     test cl, cl
-    jz _endPrintFP              ; End if NULL character is reached
+    jz _endPrintFP              ; End si encuentra null
     inc qword[lenFirstPart]
 
     cmp cl, ' '
     je _checkWordBoundaryFP
-    cmp cl, 9                 ; ASCII for Tab
+    cmp cl, 9                 ; ASCII  Tab
     je _checkWordBoundaryFP
-    cmp cl, 10                ; ASCII for Newline
+    cmp cl, 10                ; ASCII  Newline
     je _checkWordBoundaryFP
 
-    inc qword[printCont]           ; Increment character counter
-    inc r9                    ; Move to next character
+    inc qword[printCont]           ; Incrementa contador
+    inc r9                    ; Mueve al siguiente caracter
     jmp _printLoopFP
 
 _checkWordBoundaryFP:
-    inc qword[wordCount]           ; Increment word count
+    inc qword[wordCount]           ; Incrementa contador de palabras
     cmp qword[wordCount], 10
-    jl _incrementCharFP         ; If less than 10 words, keep printing
+    jl _incrementCharFP         ; Si es menos de 10 palabras sigue printeando
     
     mov rsi, [lineCount]
     call _startItoa
@@ -546,8 +546,8 @@ _checkWordBoundaryFP:
     je _firstcontinueBoundary
 
 
-    mov rax, [buffer] ; Load '1' from userInput into AL
-    mov rbx, [user_input_line]    ; Load '1' from buffer into BL
+    mov rax, [buffer] ; Load '1' de userInput a AL
+    mov rbx, [user_input_line]    ; Load '1' de buffer a BL
 
     cmp rax, rbx
     jne _skipLinePLTE
@@ -556,18 +556,18 @@ _checkWordBoundaryFP:
     mov rax, 1
     mov rdi, 1
     mov rsi, buffer
-    mov rdx, 5              ; Number of characters from lastPrint to current position
+    mov rdx, 5              ; Numero de caracteres de lastPrint a la posicion actual
     syscall
 
 
-	mov rax, 1                  ; syscall: write
-	mov rdi, 1                  ; fd: stdout
-	mov rsi, [lastPrint]        ; Start of string to print
+	mov rax, 1                  
+	mov rdi, 1                  
+	mov rsi, [lastPrint]        ; Inicio de string a imprimir
 	mov rdx, r9
-	sub rdx, [lastPrint]        ; Calculate length to print
-	test rdx, rdx               ; Check if length is positive
-	jle _endPrintFP              ; Skip printing if length is not positive
-	syscall                     ; Perform print
+	sub rdx, [lastPrint]        ; Calculate length para imprimir
+	test rdx, rdx               ; Check si lenght es positiva
+	jle _endPrintFP              ; skip imprimir si no es positivo
+	syscall                     
 	
     mov rax, 1
     mov rdi, 1
@@ -583,20 +583,20 @@ _checkWordBoundaryFP:
     _skipLinePLTE:				; CHEQUEO por si no se necesita el print
 
 	mov rdx, r9
-	sub rdx, [lastPrint]        ; Calculate length to print
-	test rdx, rdx               ; Check if length is positive
-	jle _endPrintFP              ; Skip printing if length is not positive
+	sub rdx, [lastPrint]        ; calcula length para imprimir
+	test rdx, rdx               ; check si length es positivo
+	jle _endPrintFP              ; Skip printing si el len no es positivo
 	syscall 
 
 	_continueBoundary:
-    mov [lastPrint], r9       ; Update lastPrint to new position
+    mov [lastPrint], r9       ; Update lastPrint
     xor rax, rax
     mov [wordCount], rax      ; Reset word count
-    inc qword[lineCount]           ; Increment line count
+    inc qword[lineCount]           ; Incrementa line count
 
 _incrementCharFP:
-    inc qword[printCont]           ; Increment character counter
-    inc r9                    ; Move to next character
+    inc qword[printCont]           ; Incrementa contador caracter
+    inc r9                    ; Move al siguiente caracter
     jmp _printLoopFP
 
 _endPrintFP:
@@ -606,8 +606,8 @@ _endPrintFP:
     cmp byte[flag_printOnePhrase], 0
     je _firstcontinueEP
     
-    mov rax, [buffer] ; Load '1' from userInput into AL
-    mov rbx, [user_input_line]    ; Load '1' from buffer into BL
+    mov rax, [buffer] ; Load '1' de userInput a AL
+    mov rbx, [user_input_line]    ; Load '1' de buffer a BL
     
 
 
@@ -618,19 +618,19 @@ _endPrintFP:
     mov rax, 1
     mov rdi, 1
     mov rsi, buffer
-    mov rdx, 2               ; Number of characters from lastPrint to current position
+    mov rdx, 2               ; Numero de caracteres de lastPrint a posicion actual
     syscall
     
-    mov rsi, [lastPrint]      ; Get the pointer to the last printed position
-    mov rdx, r9               ; Get the current position in text
-    sub rdx, rsi              ; Calculate the length of the remaining text
-    test rdx, rdx             ; Check if there is anything to print
-    jle _finalizeFP             ; Jump to finalize if nothing to print
+    mov rsi, [lastPrint]     
+    mov rdx, r9              
+    sub rdx, rsi            
+    test rdx, rdx             
+    jle _finalizeFP            
 
-    ; Print remaining content
-    mov rax, 1                ; syscall number for sys_write
-    mov rdi, 1                ; file descriptor 1 for stdout
-    syscall                   ; Execute the print
+    ; Print contenido restante
+    mov rax, 1            
+    mov rdi, 1            
+    syscall               
     
 _finalizeFP:
     cmp byte[flag_printOnePhrase], 1
@@ -650,8 +650,8 @@ _finalizarErrorseleccionFP:
 
    
 _finishSpecialFP:
-	mov rsi, [lastPrint]      ; Get the pointer to the last printed position
-    mov rdx, r9               ; Get the current position in text
+	mov rsi, [lastPrint]      ; Consigue el pointer a la ultima posicion impresa
+    mov rdx, r9               ; consigue la posicion actual en text
     sub rdx, rsi
 
     mov qword[lenPrint], rdx
@@ -669,8 +669,8 @@ _finishSpecialFP2:
     syscall
     pop rdx
     
-    mov rsi, [lastPrint]      ; Get the pointer to the last printed position
-    mov rdx, r9               ; Get the current position in text
+    mov rsi, [lastPrint]      ; get pointer a la ultima posicion impresa
+    mov rdx, r9               ; Consigue posicion actual en text
     sub rdx, rsi
     
     inc qword[lenFirstPart]
@@ -731,33 +731,30 @@ _getInputInfo:
 	ret
 	
 get_inputSPECIAL:
-    mov rax, 0         ; syscall number for read
+    mov rax, 0         ; syscall para leer
     mov rdi, 0         ; file descriptor 0 (stdin)
-    mov rsi, user_input_line; buffer to store the input
-    add rsi, 1         ; Adjust buffer pointer to leave space for the space character
-    mov rdx, 2049      ; reduce max bytes by one to account for the space at the start
-    syscall            ; perform the syscall
+    mov rsi, user_input_line; buffer para guardar input
+    add rsi, 1         ; ajuste buffer para tener espacio para el caracter  de nueva linea
+    mov rdx, 2049      
+    syscall            ; hacer syscall
 
-    ; Assuming rax contains the number of bytes read, adjust for newline character
-    test rax, rax      ; Check if any bytes were read
-    jz input_done      ; Jump if zero bytes were read (skip if input is empty)
+    ; Asumiendo que rax contiene el numero de bytes leidos ajuste por cracter de nueva linea
+    test rax, rax      ; Check si se leyo algun byte
+    jz input_done      ; Jump si no se leyo ningun byte
 
-    dec rax            ; Decrement rax to exclude the newline character from the count
-    mov byte [rsi + rax], 0 ; Replace newline with null terminator
+    dec rax            ; Decrement rax para excluir el caracter de nueva linea del count
+    mov byte [rsi + rax], 0 ; Replace newline con null
 
-    ; Insert space at the beginning of the buffer
-    dec rsi            ; Move back to the start of the buffer
-    mov byte [rsi], ' '; Insert space character
+    dec rsi            ; Move back al start del buffer
+    mov byte [rsi], ' '
 
 input_done:
-    ret                ; Return from the function
+    ret             
  
     
 _editText:
     ; Copia la primera parte al buffer nuevo
 
-
-	
     mov r8, [lenFirstPart] 
     sub r8, [lenPrint]
     
@@ -768,9 +765,9 @@ _editText:
     rep movsb
     
 
-    ; Añade text_test
+    
     mov rsi, user_input_line
-    mov rcx, [lenUserText]  ; Longitud de 'xd ' sin contar el null terminator
+    mov rcx, [lenUserText]  ; Longitud sin contar el null terminator
     rep movsb
     
 
@@ -919,16 +916,8 @@ editar_archivo:
     call _genericprint
     mov rax, deco6
     call _genericprint
-    
-    mov rax, instruction_compare
-    call _genericprint
-    
-    ; Imprimir un enter
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, espacio
-    mov rdx, 1
-    syscall
+ 
+    call _enterPrint
     
     call _manageDinamicFile
     
@@ -1236,35 +1225,35 @@ is_binary:
 
 ;--------------------BIN A HEX-------------------------------------------
 bin_to_hex:
-    mov rsi, 0                  ; Reset string length counter
-    mov r13, [bin_num]          ; Load the binary number
-    mov rdi, hex_result         ; Point to the result buffer
-    xor r8, r8                  ; Clear loop counter
+    mov rsi, 0                  ; Resetea contador
+    mov r13, [bin_num]          ; Carga el numero binario
+    mov rdi, hex_result         ; Pointter a el resultado
+    xor r8, r8                  ; Limpia contador
 
 loop_base16:
-    mov r11, 0xf                ; Mask to extract the lowest 4 bits
-    and r11, r13                ; Extract the 4 least significant bits
-    shr r13, 4                  ; Shift the binary number right by 4 bits
-    mov dl, [digits + r11]      ; Get the corresponding hex digit
+    mov r11, 0xf                ; Enmascaracion para extraccion
+    and r11, r13                ; Extrae los 4 bits menos significativos
+    shr r13, 4                  ; Shift right 4
+    mov dl, [digits + r11]      ; Consigue el hex correspondiente
 
 store_digit_16:
-    mov [rdi + rsi], dl         ; Store the hex digit in the result string
-    inc rsi                     ; Move to the next position in the string
-    inc r8                      ; Increment the loop counter
-    cmp r8, 1024                ; Check if we've processed 1024 hex digits
-    je final_base_16            ; If so, we're done
+    mov [rdi + rsi], dl         ; Guarda el hex
+    inc rsi                     ; Moverse a siguiente posicion 
+    inc r8                      ; Incrementar contador
+    cmp r8, 1024                ; Check si hemos procesado 1024 caracteres
+    je final_base_16          
     
-    test r13, r13               ; Check if any bits are left to process
-    jnz loop_base16       ; If there are, continue the loop
+    test r13, r13               ; Check si hay bits por cambiar
+    jnz loop_base16       
 
 final_base_16:
-    mov byte [rdi + rsi], 0     ; Null-terminate the result string
+    mov byte [rdi + rsi], 0     ; Null-terminate
     mov rdx, rdi
     lea rcx, [rdi + rsi - 1]
-    call reversetest           ; Reverse the string
+    call reversetest           
     
     mov rax, hex_result
-    call _genericprint          ; Print the string
+    call _genericprint         
     ret
 
 ;--------------------ASCII A HEX-------------------------------------------
@@ -1311,22 +1300,22 @@ end_convert_loop:
 
 _AtoiStart:
     ; Convert binary string to number
-    mov rsi, readFileBuffer       ; Load address of binary string
-    xor rax, rax                  ; Clear rax to use it as the result
-    xor rcx, rcx                  ; Clear rcx to use it as a counter
+    mov rsi, readFileBuffer       ; load direccion
+    xor rax, rax                  ; limpia rax para hacer un contador
+    xor rcx, rcx                  ; Clear rcx para hacer un contador
 
 bin_to_number_loop:
-    mov dl, [rsi + rcx]           ; Load current character
-    cmp dl, 10                     ; Check for null terminator
-    je bin_to_number_done         ; If null terminator, we're done
-    shl qword[bin_num], 1         ; Shift result left by 1 (multiply by 2)
-    cmp dl, '1'                   ; Check if character is '1'
-    jne skip_add_one              ; If not '1', skip addition
-    add qword[bin_num], 1                    ; Add 1 to the result (since current bit is 1)
+    mov dl, [rsi + rcx]           ; Load caracter actua;
+    cmp dl, 10                     ; Check por null
+    je bin_to_number_done         
+    shl qword[bin_num], 1         ; Shift result left por 1 
+    cmp dl, '1'                   ; Check si el cracater es '1'
+    jne skip_add_one              ; Si no es 1 skip suma
+    add qword[bin_num], 1                    ; Add 1 al resultado
 
 skip_add_one:
-    inc rcx                       ; Move to the next character
-    jmp bin_to_number_loop        ; Repeat the loop
+    inc rcx                       ; Mover a el siguiente caracter
+    jmp bin_to_number_loop       
 
 bin_to_number_done:
     ret
@@ -1431,21 +1420,21 @@ _manageDinamicFile:
 file_stats:    
     push rax
     ; Get file statistics
-    mov rax, 5                          ; syscall number for fstat (5)
+    mov rax, 5                          ; syscall number para fstat (5)
     mov rdi, [fd]                       ; file descriptor
-    mov rsi, statbuf                    ; pointer to buffer
+    mov rsi, statbuf                    ; pointer al buffer
     syscall                             ; invoke syscall
-    test rax, rax                       ; check if result is non-negative
-    js _finishErrorCode                 ; jump to error if negative (fstat failed)
+    test rax, rax                       ; check si no es positico
+    js _finishErrorCode                 ; jump si es negativo
     
-    ; Extract the file size (off_t st_size is at offset 48 in the struct stat)
-    mov rax, [statbuf + 48]             ; read st_size from struct stat
-    mov [filesize], rax                 ; store the file size
     
-    ; Check if file size is greater than 4096
-    cmp rax, 4096                       ; compare file size with 4096
-    jle file_ok                         ; if less or equal, file is ok
-    jmp file_too_large                  ; otherwise, file is too large
+    mov rax, [statbuf + 48]             ; read st_size de struct stat
+    mov [filesize], rax                 ; store el tamano del archivo
+    
+    ; Check si file size es mayor que 4096
+    cmp rax, 4096                       
+    jle file_ok                         ; if menos o igual todo bien
+    jmp file_too_large                  ; de otra manera el archivo es demasiado grande
 
 file_ok:
     pop rax
@@ -1493,36 +1482,36 @@ _readFile:
 	syscall
 	ret
 	
-clear_input:    ; Start address of user_input
-    mov rcx, 4097          ; Size of user_input in bytes
-    xor rax, rax           ; Set rax to 0 (value to set)
-    rep stosb              ; Repeat storing AL into memory at RDI, RCX times
+clear_input:    ; Direccion de inicio
+    mov rcx, 4097          ; tamao de user input en bytes
+    xor rax, rax           
+    rep stosb            
     ret
 
 ; Abre el archivo para escritura y truncamiento
 _openFileToEdit:
     mov rax, 2               ; sys_open syscall number
-    lea rdi, [dynamicFile]      ; Address of filename
-    mov rsi, 0201h           ; Flags: O_WRONLY | O_TRUNC (open for writing and truncate)
-    mov rdx, 0666h           ; Permissions: rw-rw-rw- (if the file needs to be created)
-    syscall                  ; Perform the syscall
-    mov [file_desc], rax     ; Store the file descriptor in a memory location
+    lea rdi, [dynamicFile]      ; Direccion del file
+    mov rsi, 0201h           ; Flags: O_WRONLY | O_TRUNC 
+    mov rdx, 0666h           ; Permissions: rw-rw-rw- 
+    syscall                  ; Hacer el syscall
+    mov [file_desc], rax     ; Store el descriptor de file in una localizacion de memoria
     ret
 
 ; Escribe en el archivo
 _writeToFile:
     mov rax, 1               ; sys_write syscall number
-    mov rdi, [file_desc]     ; Load the stored file descriptor into rdi
-    lea rsi, [new_text]    ; Address of data to write
-    mov rdx, qword[lentext]       ; Length of data to write
-    syscall                  ; Perform the syscall
+    mov rdi, [file_desc]     ; Load el file descriptor en rdi
+    lea rsi, [new_text]    ; Address de data a escribir
+    mov rdx, qword[lentext]       ; Length de data a escribir
+    syscall                 
     ret
 
 ; Cierra el archivo
 _closeFile:
     mov rax, 3               ; sys_close syscall number
-    mov rdi, [file_desc]     ; Load the stored file descriptor into rdi
-    syscall                  ; Perform the syscall
+    mov rdi, [file_desc]     ; Load el file descriptor en rdi
+    syscall                 
     ret
     
 copy_string:
